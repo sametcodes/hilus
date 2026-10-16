@@ -1,0 +1,23 @@
+{
+  "name": "hilus",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "tauri": "tauri",
+    "gen-defaults": "node scripts/gen-defaults.mjs",
+    "bump": "node scripts/bump-version.mjs"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2.12.4",
+    "@tauri-apps/plugin-process": "^2.4.0",
+    "@tauri-apps/plugin-updater": "^2.14.0"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.12.3",
+    "typescript": "^5.9.3",
+    "vite": "^6.4.4"
+  }
+}

@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Hilus</title>
+    <link rel="stylesheet" href="/src/styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>
+        Hilus
+      </div>
+      <div id="model-status" class="model-status"></div>
+      <div class="spacer"></div>
+      <div id="update-banner" class="update-banner" hidden></div>
+      <div id="rec-indicator" class="rec-indicator" aria-live="polite">
+        <span class="rec-dot"></span>
+        <span>Kaydediliyor</span>
+        <span class="rec-level"><span></span></span>
+      </div>
+      <button id="btn-settings" class="btn ghost">Ayarlar</button>
+    </header>
+
+    <main class="workspace">
+      <section class="panel">
+        <div class="panel-head">
+          <h1>Dikte parçaları</h1>
+          <span id="parts-count" class="muted"></span>
+          <div class="spacer"></div>
+          <span class="muted keys-hint"><kbd>Space</kbd> basılı tut: kayıt</span>
+          <button id="btn-select-all" class="btn ghost small" hidden>Tümünü seç / kaldır</button>
+        </div>
+        <div id="parts-list" class="parts-list"></div>
+        <div class="panel-foot">
+          <span class="foot-label">Şablon</span>
+          <div id="template-choice" class="template-choice"></div>
+          <span id="token-estimate" class="muted" title="Gönderilecek prompt'un kaba token tahmini"></span>
+          <div class="spacer"></div>
+          <button id="btn-process" class="btn primary" title="⌘/Ctrl + Enter">İşle</button>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <h1>Rapor</h1>
+          <div class="spacer"></div>
+          <button id="btn-undo" class="btn ghost small" hidden>Geri al</button>
+          <button id="btn-clear" class="btn ghost small">Temizle</button>
+          <button id="btn-edit" class="btn ghost small">Düzenle</button>
+        </div>
+        <div id="report-view" class="report-view"></div>
+        <div class="panel-foot">
+          <span class="muted">Kopyala: RTF + HTML + düz metin, ardından oturum temizlenir.</span>
+          <div class="spacer"></div>
+          <button id="btn-copy" class="btn primary">Kopyala</button>
+        </div>
+      </section>
+    </main>
+
+    <div id="settings" class="settings-overlay" hidden></div>
+    <div id="toast" class="toast" role="status"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

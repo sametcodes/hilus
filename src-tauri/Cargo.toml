@@ -1,0 +1,53 @@
+[package]
+name = "hilus"
+version = "0.1.0"
+description = "Radyoloji dikte toplayıcı: parça parça dikte, tek seferde LLM ile rapor"
+edition = "2021"
+rust-version = "1.85"
+
+[lib]
+name = "hilus_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["tray-icon", "image-png"] }
+tauri-plugin-single-instance = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+cpal = "0.18"
+reqwest = { version = "0.12", default-features = false, features = ["json", "stream", "rustls-tls"] }
+futures-util = "0.3"
+tokio = { version = "1", features = ["fs", "io-util"] }
+regex = "1"
+dirs = "6"
+tauri-plugin-updater = "2"
+tauri-plugin-process = "2"
+
+# macOS: Metal ile GPU hızlandırma (transcribe-cpp varsayılanı).
+[target.'cfg(target_os = "macos")'.dependencies]
+transcribe-cpp = { version = "0.4" }
+objc2 = "0.6"
+objc2-foundation = { version = "0.3", features = ["NSString", "NSData"] }
+objc2-app-kit = { version = "0.3", features = ["NSPasteboard"] }
+
+# Windows/Linux: varsayılan CPU arka ucu (ek SDK gerektirmez). GPU için README'deki
+# `vulkan` özelliğine bakın.
+[target.'cfg(not(target_os = "macos"))'.dependencies]
+transcribe-cpp = { version = "0.4", default-features = false }
+
+[target.'cfg(windows)'.dependencies]
+clipboard-win = "5"
+
+[features]
+# Windows'ta Vulkan GPU arka ucu (Vulkan SDK gerekir): `npm run tauri build -- --features vulkan`
+vulkan = ["transcribe-cpp/vulkan"]
+
+[profile.release]
+codegen-units = 1
+lto = true
+
+[dev-dependencies]
+hound = "3"
