@@ -14,4 +14,4 @@ for (const file of ["package.json", "src-tauri/tauri.conf.json"]) {
 }
 const cargo = "src-tauri/Cargo.toml";
 writeFileSync(cargo, readFileSync(cargo, "utf8").replace(/^version = ".*"$/m, `version = "${version}"`));
-console.log(`Sürüm ${version}. Şimdi: git commit -am "chore: v${version}" && git tag v${version} && git push --follow-tags`);
+console.log(`Sürüm ${version}. Şimdi: git commit -am "chore: v${version}" && git push && gh workflow run release.yml`);

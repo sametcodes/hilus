@@ -156,12 +156,18 @@ gerekir); yedekleyin, repoya koymayın.
 
 ```bash
 npm run bump -- 0.2.0
-git commit -am "chore: v0.2.0" && git tag v0.2.0 && git push --follow-tags
+git commit -am "chore: v0.2.0" && git push
+gh workflow run release.yml
 ```
 
-`.github/workflows/release.yml` etiketi görünce macOS (Apple Silicon `.dmg`) ve Windows
-(`.exe` NSIS, `.msi`) paketlerini derler, Release'i oluşturur ve imzalı `latest.json`'u ekler.
+`.github/workflows/release.yml` macOS (Apple Silicon `.dmg`) ve Windows (`.exe` NSIS, `.msi`)
+paketlerini derler, `v0.2.0` etiketini ve Release'i oluşturur, imzalı `latest.json`'u ekler.
 Kurulu uygulamalar bu sürümü kendileri bulur. (Intel Mac paketi üretilmiyor.)
+
+**Derleme süresi:** ilk derleme (transcribe.cpp'nin kaynaktan derlenmesi dahil) ~10–15 dk.
+Rust derleme çıktısı `swatinem/rust-cache` ile önbelleğe alınır; iş akışı `main` üzerinde
+çalıştığı için önbellek sonraki sürümlerde de kullanılır ve yalnızca değişen crate'ler yeniden
+derlenir. (Etiketle tetiklenseydi GitHub önbelleği o etikete bağlar, sonraki sürüm göremezdi.)
 
 ## Kurulum ve derleme
 

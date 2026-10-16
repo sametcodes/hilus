@@ -1,6 +1,10 @@
-# Sürüm yayımlar: `v0.2.0` gibi bir etiket gönderilince macOS (Apple Silicon) ve Windows
-# paketlerini derler, GitHub Release'e yükler ve uygulamanın otomatik güncelleyicisinin
-# okuduğu imzalı `latest.json`'u ekler.
+# Sürüm yayımlar: macOS (Apple Silicon) ve Windows paketlerini derler, `v{sürüm}` etiketli
+# GitHub Release'e yükler ve otomatik güncelleyicinin okuduğu imzalı `latest.json`'u ekler.
+#
+# Tetikleme: `main` üzerinde elle — `gh workflow run release.yml` (ya da Actions → release →
+# Run workflow). Etiketi tauri-action kendisi oluşturur. Etiketle tetiklenmiyor, çünkü GitHub
+# önbelleği oluşturulduğu ref'e bağlar: etiketteki önbelleği sonraki etiket göremez ve her
+# sürüm baştan derlenir. main'deki önbelleği ise sonraki her çalıştırma kullanır.
 #
 # Gerekli repo gizlileri (Settings → Secrets and variables → Actions):
 #   TAURI_SIGNING_PRIVATE_KEY           ~/.tauri/hilus-updater.key dosyasının içeriği
@@ -8,8 +12,6 @@
 name: release
 
 on:
-  push:
-    tags: ["v*"]
   workflow_dispatch:
 
 permissions:
@@ -50,8 +52,8 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
-          tagName: ${{ github.ref_type == 'tag' && github.ref_name || 'v__VERSION__' }}
-          releaseName: "Hilus ${{ github.ref_type == 'tag' && github.ref_name || 'v__VERSION__' }}"
+          tagName: v__VERSION__
+          releaseName: Hilus v__VERSION__
           releaseBody: "Kurulum: Windows için .exe (veya .msi), macOS (Apple Silicon) için .dmg. Kurulu uygulama bu sürümü kendisi bulur ve güncellenir."
           releaseDraft: false
           prerelease: false
