@@ -12,6 +12,8 @@ export const api = {
   stopAndTranscribe: () => invoke<string>("stop_and_transcribe"),
   processReport: (prompt: string) => invoke<string>("process_report", { prompt }),
   copyReport: (text: string) => invoke<void>("copy_report", { text }),
+  sendReport: (description: string, details: Record<string, string>) =>
+    invoke<number>("send_report", { description, details }),
   listModels: (provider: string, apiKey: string, baseUrl: string) =>
     invoke<ModelInfo[]>("list_models", { provider, apiKey, baseUrl }),
 };

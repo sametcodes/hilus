@@ -6,6 +6,7 @@ import { customSelect } from "./select";
 import { checkForUpdates, initUpdater } from "./updater";
 import { initWordEdit, wordText } from "./word-edit";
 import { confirmDialog } from "./dialog";
+import { openReportDialog } from "./report-dialog";
 import { openSettings, settingsOpen } from "./settings-view";
 import type { ModelStatus, Part, Settings } from "./types";
 
@@ -52,6 +53,7 @@ async function init() {
       render();
     });
   });
+  $("btn-report").addEventListener("click", () => openReportDialog(reportDetails(), toast));
   $("btn-process").addEventListener("click", () => void processParts());
   $("btn-copy").addEventListener("click", () => void copyReport());
   $("btn-undo").addEventListener("click", undo);
@@ -117,6 +119,19 @@ async function stopRecording() {
     toast(errorText(err), "error");
   }
   renderParts();
+}
+
+/** Sorun bildirimine eklenen teknik bilgi — dikte veya rapor içeriği yok. */
+function reportDetails(): Record<string, string> {
+  const whisper = modelStatus.state === "ready" ? `hazır (${backendLabel(modelStatus.backend)})` : modelStatus.state;
+  const model = { anthropic: settings.anthropicModel, gemini: settings.geminiModel, openai: settings.openaiModel }[settings.provider];
+  return {
+    Whisper: whisper,
+    "LLM sağlayıcısı": `${settings.provider} · ${model || "?"}`,
+    "Şablon seçimi": templateChoice,
+    "Şablon sayısı": String(settings.prompt.templates.length),
+    "Parça sayısı": String(parts.length),
+  };
 }
 
 // ---------- İşle / Kopyala ----------

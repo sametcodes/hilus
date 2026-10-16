@@ -1138,3 +1138,37 @@ textarea.preview {
   border-color: var(--danger);
   color: #fff;
 }
+
+.report-dialog {
+  width: min(520px, 100%);
+}
+
+.report-dialog h2 {
+  margin-bottom: 10px;
+}
+
+.report-dialog textarea {
+  margin-bottom: 10px;
+}
+
+.warn-box {
+  background: var(--danger-soft);
+  color: var(--danger);
+  border-radius: 7px;
+  padding: 8px 10px;
+}
+
+.report-info {
+  font-size: 12.5px;
+  margin-bottom: 12px;
+  color: var(--muted);
+}
+
+.report-info summary {
+  cursor: pointer;
+}
+
+.report-info ul {
+  margin: 6px 0 0;
+  padding-left: 18px;
+}

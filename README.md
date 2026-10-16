@@ -35,6 +35,33 @@ sağ tık menüsünde “Hilus'u göster”, “Güncellemeleri denetle”, “�
 gizliyken Dock simgesi de gizlenir. Uygulama ikinci kez başlatılırsa yeni kopya açılmaz,
 mevcut pencere öne gelir.
 
+## Sorun bildir
+
+Üst çubuktaki **Sorun bildir** kısa bir açıklama ister ve GitHub'da (`sametcodes/hilus`)
+`sorun-bildirimi` etiketli bir issue açar; doktorun GitHub hesabı gerekmez. Açıklamaya yalnızca
+teknik bilgi eklenir (sürüm, işletim sistemi, Whisper durumu, sağlayıcı/model, şablon seçimi,
+parça sayısı); dikte, rapor ve ses **gönderilmez**. Issue'lar herkese açık olduğundan pencere,
+hasta bilgisi yazılmaması için uyarır.
+
+Akış: uygulama → `worker/` altındaki Cloudflare Worker (`hilus-report`,
+`https://hilus-report.hey-d80.workers.dev/report`) → GitHub REST API. GitHub token'ı yalnızca
+Worker'ın gizlisinde durur (public uygulamaya token gömülmez). IP başına dakikada en fazla 3
+bildirim kabul edilir; istek gövdesi kaydedilmez.
+
+**Token kurulumu (bir kez):**
+
+1. GitHub → Settings → Developer settings → Personal access tokens → **Fine-grained tokens**
+   → Generate new token: *Repository access* yalnızca `sametcodes/hilus`; *Permissions* →
+   **Issues: Read and write** (başka izin gerekmez). Süresini uzun tutun (ör. 1 yıl).
+2. Worker'a gizli olarak ekleyin:
+
+   ```bash
+   cd worker && npx wrangler secret put GITHUB_TOKEN
+   ```
+
+Token süresi dolarsa bildirimler “GitHub isteği başarısız (401)” hatası verir; aynı adımlarla
+yenileyin. Worker kodu değişirse: `cd worker && npm install && npm run deploy`.
+
 ## Gizlilik
 
 - Ses, parçalar, rapor ve geçmiş **asla diske yazılmaz**; yalnızca uygulama belleğinde yaşar.
@@ -45,7 +72,8 @@ mevcut pencere öne gelir.
   göz önünde bulundurun.
 - Dışarı giden tek veri “İşle”ye basıldığında seçili LLM sağlayıcısına giden prompt'tur
   (şablonlar + işaretli dikte metni). Bunun dışında Ayarlar'da model listesi için sağlayıcıya,
-  güncelleme denetimi için GitHub'a (yalnızca `latest.json`) istek gider.
+  güncelleme denetimi için GitHub'a (yalnızca `latest.json`) ve doktor “Sorun bildir”i
+  kullanırsa yazdığı açıklama ile teknik bilgi Worker'a gider.
 
 ## Whisper modeli
 
@@ -228,4 +256,5 @@ src/select.ts             native <select> yerine özel açılır liste / birleş
 src/drag-sort.ts          işaretçi olaylarıyla sürükle-bırak sıralama
 src/updater.ts            GitHub Releases güncelleme denetimi ve kurulumu
 .github/workflows/        release.yml — etiketle sürüm yayımlama
+worker/                   “Sorun bildir” Cloudflare Worker'ı (GitHub issue açar)
 ```

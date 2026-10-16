@@ -1,0 +1,20 @@
+{
+  // Hilus "Sorun bildir" uç noktası: uygulamadan gelen bildirimi GitHub issue'su olarak açar.
+  // GitHub token'ı gizli olarak durur: `npx wrangler secret put GITHUB_TOKEN`
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "hilus-report",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-01",
+  "workers_dev": true,
+  "vars": {
+    "GITHUB_REPO": "sametcodes/hilus"
+  },
+  // IP başına dakikada en fazla 3 bildirim.
+  "ratelimits": [
+    {
+      "name": "REPORT_LIMITER",
+      "namespace_id": "4711",
+      "simple": { "limit": 3, "period": 60 }
+    }
+  ]
+}

@@ -1,6 +1,7 @@
 mod audio;
 mod clipboard;
 mod llm;
+mod report;
 mod rich;
 mod settings;
 mod tray;
@@ -79,6 +80,15 @@ async fn list_models(
 }
 
 #[tauri::command]
+async fn send_report(
+    app: AppHandle,
+    description: String,
+    details: std::collections::BTreeMap<String, String>,
+) -> Result<u64, String> {
+    report::send(&app, &description, details).await
+}
+
+#[tauri::command]
 async fn copy_report(app: AppHandle, text: String) -> Result<(), String> {
     let rich = rich::render(&text);
     // macOS'ta NSPasteboard ana iş parçacığından kullanılmalı.
@@ -120,6 +130,7 @@ pub fn run() {
             process_report,
             copy_report,
             list_models,
+            send_report,
         ])
         .build(tauri::generate_context!())
         .expect("Hilus başlatılamadı")
