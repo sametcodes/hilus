@@ -2,6 +2,7 @@ import { check, type Update } from "@tauri-apps/plugin-updater";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { errorText } from "./api";
 import { h } from "./dom";
+import { confirmDialog } from "./dialog";
 
 type Notify = (message: string, kind: "info" | "error" | "success") => void;
 
@@ -47,9 +48,8 @@ function showBanner(update: Update) {
 async function install() {
   const update = pending;
   if (!update) return;
-  if (hasSession() && !confirm("Güncelleme uygulamayı yeniden başlatır; açık dikte parçaları ve rapor silinir. Devam edilsin mi?")) {
-    return;
-  }
+  const message = "Güncelleme uygulamayı yeniden başlatır; açık dikte parçaları ve rapor silinir. Devam edilsin mi?";
+  if (hasSession() && !(await confirmDialog(message, { confirmLabel: "Güncelle" }))) return;
   const banner = document.getElementById("update-banner")!;
   const label = h("span", {}, "İndiriliyor…");
   banner.replaceChildren(label);

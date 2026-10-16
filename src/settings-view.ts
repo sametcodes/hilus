@@ -4,6 +4,7 @@ import { buildPromptTemplate, makeTag } from "./prompt";
 import { customSelect, type SelectOption } from "./select";
 import { enableDragSort } from "./drag-sort";
 import { checkForUpdates } from "./updater";
+import { alertDialog, confirmDialog } from "./dialog";
 import { getVersion } from "@tauri-apps/api/app";
 import type { ModelInfo, PromptConfig, Provider, Settings, Template } from "./types";
 
@@ -84,7 +85,7 @@ async function save() {
     onSaved(structuredClone(draft));
     close();
   } catch (err) {
-    alert(`Ayarlar kaydedilemedi: ${errorText(err)}`);
+    await alertDialog(`Ayarlar kaydedilemedi: ${errorText(err)}`);
   }
 }
 
@@ -328,8 +329,8 @@ function templatesTab(p: PromptConfig): Node[] {
 }
 
 function templateEditor(t: Template, list: Template[]): HTMLElement {
-  const remove = () => {
-    if (!confirm(`“${t.name}” şablonu silinsin mi?`)) return;
+  const remove = async () => {
+    if (!(await confirmDialog(`“${t.name}” şablonu silinsin mi? (Ayarları kaydetmeden çıkarsanız geri gelir.)`, { confirmLabel: "Sil", danger: true }))) return;
     list.splice(list.indexOf(t), 1);
     render();
   };
@@ -344,7 +345,7 @@ function templateEditor(t: Template, list: Template[]): HTMLElement {
     ),
     field("Şablon metni", textArea(t.body, (v) => (t.body = v), 16, true), "{...} süslü parantezler modele talimattır, çıktıda kalmaz."),
     field("Kısaltmalar", textArea(t.abbreviations, (v) => (t.abbreviations = v), 7, true), "Her satır: - \"söylenen\" → Rapordaki tam cümle."),
-    h("div", { class: "row-end" }, h("button", { class: "btn ghost danger small", onclick: remove }, "Şablonu sil")),
+    h("div", { class: "row-end" }, h("button", { class: "btn ghost danger small", onclick: () => void remove() }, "Şablonu sil")),
   );
 }
 
@@ -419,7 +420,8 @@ function whisperTab(s: Settings): Node[] {
 
 function rulesTab(p: PromptConfig): Node[] {
   const resetAll = async () => {
-    if (!confirm("Şablonlar, kısaltmalar, yazım sözlüğü ve tüm talimatlar başlangıç değerlerine dönsün mü?")) return;
+    const ok = await confirmDialog("Şablonlar, kısaltmalar, yazım sözlüğü ve tüm talimatlar başlangıç değerlerine dönsün mü?", { confirmLabel: "Döndür", danger: true });
+    if (!ok) return;
     if (!draft) return;
     draft.prompt = await api.defaultPromptConfig();
     render();

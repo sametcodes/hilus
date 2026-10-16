@@ -5,6 +5,7 @@ import { AUTO, FREE, buildPrompt, estimateTokens } from "./prompt";
 import { customSelect } from "./select";
 import { checkForUpdates, initUpdater } from "./updater";
 import { initWordEdit, wordText } from "./word-edit";
+import { confirmDialog } from "./dialog";
 import { openSettings, settingsOpen } from "./settings-view";
 import type { ModelStatus, Part, Settings } from "./types";
 
@@ -55,7 +56,7 @@ async function init() {
   $("btn-copy").addEventListener("click", () => void copyReport());
   $("btn-undo").addEventListener("click", undo);
   $("btn-edit").addEventListener("click", toggleEditOutput);
-  $("btn-clear").addEventListener("click", clearSession);
+  $("btn-clear").addEventListener("click", () => void clearSession());
   $("btn-select-all").addEventListener("click", toggleSelectAll);
   render();
 }
@@ -174,9 +175,9 @@ function undo() {
   render();
 }
 
-function clearSession() {
+async function clearSession() {
   if (!parts.length && !output) return;
-  if (!confirm("Tüm parçalar ve rapor silinsin mi? (Geri alınamaz)")) return;
+  if (!(await confirmDialog("Tüm parçalar ve rapor silinsin mi? Geri alınamaz.", { confirmLabel: "Sil", danger: true }))) return;
   parts = parts.filter((p) => p.pending);
   output = "";
   editingOutput = false;
