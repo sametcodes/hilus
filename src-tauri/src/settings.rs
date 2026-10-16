@@ -63,6 +63,8 @@ pub struct Settings {
     pub microphone: Option<String>,
     /// Açılışta GitHub Releases'ta yeni sürüm var mı diye bak.
     pub auto_update_check: bool,
+    /// Kayıt başlarken ve biterken kısa uyarı sesi.
+    pub sound_feedback: bool,
     pub prompt: PromptConfig,
 }
 
@@ -80,6 +82,7 @@ impl Default for Settings {
             whisper_prompt: DEFAULT_WHISPER_PROMPT.into(),
             microphone: None,
             auto_update_check: true,
+            sound_feedback: true,
             prompt: PromptConfig::default(),
         }
     }

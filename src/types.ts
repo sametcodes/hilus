@@ -39,6 +39,7 @@ export interface Settings {
   whisperPrompt: string;
   microphone: string | null;
   autoUpdateCheck: boolean;
+  soundFeedback: boolean;
   prompt: PromptConfig;
 }
 

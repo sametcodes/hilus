@@ -7,6 +7,7 @@ import { checkForUpdates, initUpdater } from "./updater";
 import { initWordEdit, wordText } from "./word-edit";
 import { confirmDialog } from "./dialog";
 import { openReportDialog } from "./report-dialog";
+import { playStart, playStop } from "./sound";
 import { openSettings, settingsOpen } from "./settings-view";
 import type { ModelStatus, Part, Settings } from "./types";
 
@@ -80,7 +81,11 @@ function onKeyDown(e: KeyboardEvent) {
   }
   recording = api
     .startRecording()
-    .then(() => true)
+    .then(() => {
+      // Mikrofon gerçekten açıldıktan sonra: "konuşabilirsiniz".
+      if (settings.soundFeedback) playStart();
+      return true;
+    })
     .catch((err) => {
       toast(errorText(err), "error");
       return false;
@@ -101,6 +106,8 @@ async function stopRecording() {
   recording = null;
   document.body.classList.remove("is-recording");
   if (!(await started)) return;
+  // Kayıt kapandıktan hemen sonra çal ki bitiş sesi kayda girmesin.
+  if (settings.soundFeedback) window.setTimeout(playStop, 80);
   const part: Part = { id: nextId++, text: "", included: true, pending: true, editing: false };
   parts.push(part);
   renderParts();

@@ -154,6 +154,12 @@ function field(label: string, control: HTMLElement, hint?: string): HTMLElement 
   return h("label", { class: "field" }, h("span", { class: "field-label" }, label), control, hint ? h("span", { class: "hint" }, hint) : null);
 }
 
+function checkbox(value: boolean, set: (v: boolean) => void): HTMLInputElement {
+  const el = h("input", { type: "checkbox", checked: value });
+  el.addEventListener("change", () => set(el.checked));
+  return el;
+}
+
 function textInput(value: string, set: (v: string) => void, attrs: Record<string, string> = {}): HTMLInputElement {
   const el = h("input", { type: "text", value, spellcheck: false, ...attrs });
   el.addEventListener("input", () => set(el.value));
@@ -413,6 +419,7 @@ function whisperTab(s: Settings): Node[] {
     field("Başlangıç bağlamı (initial prompt)", ta),
     counter,
     h("p", { class: "hint" }, "Talimat değil, bağlamdır: doktorun dikte üslubuna benzeyen örnek rapor cümleleri ve sık terimler yazın. Whisper bunları “daha önce söylenmiş” sayar ve yazımı onlara yaklaştırır."),
+    h("label", { class: "check-row" }, checkbox(s.soundFeedback, (v) => (s.soundFeedback = v)), h("span", {}, "Kayıt başlarken ve biterken kısa ses çal")),
     h("h3", {}, "Mikrofon"),
     field("Giriş aygıtı", select(mics, s.microphone ?? "", (v) => (s.microphone = v || null))),
   ];
