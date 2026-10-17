@@ -378,7 +378,7 @@ kbd {
 
 .part {
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: auto 1fr;
   gap: 10px;
   align-items: start;
   padding: 9px 10px;
@@ -428,10 +428,18 @@ kbd {
   font-style: italic;
 }
 
+.part-side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+
 .part-actions {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  margin-left: -4px;
   opacity: 0.35;
   transition: opacity 120ms ease;
 }

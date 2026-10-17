@@ -365,7 +365,8 @@ function partView(p: Part, index: number): HTMLElement {
           : iconButton("pencil", "Tümünü düzenle", () => startEdit(p)),
         iconButton("trash", "Sil", () => removePart(p), "danger"),
       );
-  return h("div", { class: cls }, h("label", { class: "part-check" }, toggle, h("span", { class: "part-no" }, String(index + 1))), body, actions);
+  const side = h("div", { class: "part-side" }, h("label", { class: "part-check" }, toggle, h("span", { class: "part-no" }, String(index + 1))), actions);
+  return h("div", { class: cls }, side, body);
 }
 
 const ICONS = {
