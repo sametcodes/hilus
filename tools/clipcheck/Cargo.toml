@@ -1,0 +1,19 @@
+# Hilus'un pano kodunu (src-tauri/src/rich.rs + clipboard.rs) tek başına çalıştıran küçük araç.
+# Tauri'yi derlemeden Windows pano davranışını CI'da test etmek için:
+# .github/workflows/clipboard-windows.yml
+[package]
+name = "clipcheck"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+regex = "1"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "0.6"
+objc2-foundation = { version = "0.3", features = ["NSString", "NSData"] }
+objc2-app-kit = { version = "0.3", features = ["NSPasteboard"] }
+
+[target.'cfg(windows)'.dependencies]
+clipboard-win = "5"

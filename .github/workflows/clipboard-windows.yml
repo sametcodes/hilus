@@ -1,0 +1,33 @@
+# Windows'ta "Kopyala"nın kalını koruyup korumadığını test eder: Hilus'un pano kodu
+# (tools/clipcheck) panoya örnek rapor yazar, check.ps1 panoyu okuyup RichTextBox'a yapıştırır.
+# Tetikleme: pano kodu değişince main'e push, ya da elle `gh workflow run clipboard-windows.yml`.
+name: clipboard-windows
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - src-tauri/src/clipboard.rs
+      - src-tauri/src/rich.rs
+      - tools/clipcheck/**
+      - .github/workflows/clipboard-windows.yml
+
+jobs:
+  check:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: tools/clipcheck -> target
+
+      - name: Örnek raporu Hilus koduyla panoya yaz
+        run: cargo run --release --manifest-path tools/clipcheck/Cargo.toml
+
+      - name: Panoyu doğrula ve RichTextBox'a yapıştır
+        shell: powershell
+        run: ./tools/clipcheck/check.ps1
