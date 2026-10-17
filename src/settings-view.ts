@@ -470,8 +470,8 @@ function appTab(s: Settings): Node[] {
   return [
     h("h3", {}, "Uygulama"),
     h("p", {}, "Hilus ", version),
-    h("label", { class: "check-row" }, toggle, h("span", {}, "Açılışta güncellemeleri denetle (GitHub Releases)")),
-    h("p", { class: "hint" }, "Denetim yalnızca sürüm bilgisini (latest.json) indirir; hiçbir dikte veya rapor gönderilmez. Güncelleme imzalıdır; imza tutmazsa kurulmaz."),
+    h("label", { class: "check-row" }, toggle, h("span", {}, "Güncellemeleri otomatik indir (GitHub Releases)")),
+    h("p", { class: "hint" }, "Açılışta ve 6 saatte bir denetlenir; yeni sürüm arka planda iner, kurulum üst çubuktaki “Yeniden başlat” ile yapılır. Hiçbir dikte veya rapor gönderilmez. Güncelleme imzalıdır; imza tutmazsa kurulmaz."),
     h("button", { class: "btn small", onclick: () => void checkForUpdates(true) }, "Şimdi denetle"),
     h("h3", {}, "Tepsi"),
     h("p", { class: "hint" }, "Pencereyi kapatmak uygulamayı kapatmaz; Hilus sistem tepsisinde (macOS'ta menü çubuğunda) çalışmayı sürdürür ve oturum bellekte kalır. Tamamen kapatmak için tepsi menüsünden “Çık”."),

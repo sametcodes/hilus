@@ -6,67 +6,93 @@ import { confirmDialog } from "./dialog";
 
 type Notify = (message: string, kind: "info" | "error" | "success") => void;
 
+/** Uygulama tepside gün boyu açık kalabildiği için açılıştan sonra da arada bir denetlenir. */
+const RECHECK_MS = 6 * 60 * 60 * 1000;
+
 let notify: Notify = () => {};
 let hasSession: () => boolean = () => false;
-let pending: Update | null = null;
-let checking = false;
+let ready: Update | null = null;
+let busy = false;
 
 export function initUpdater(opts: { notify: Notify; hasSession: () => boolean }) {
   notify = opts.notify;
   hasSession = opts.hasSession;
 }
 
-/** GitHub Releases'taki latest.json'a bakar; yeni sürüm varsa üst çubukta bant gösterir. */
+/** Açılışta ve sonra RECHECK_MS aralıklarla sessizce denetler; yeni sürümü kendiliğinden indirir. */
+export function startAutoUpdates() {
+  void checkForUpdates(false);
+  window.setInterval(() => void checkForUpdates(false), RECHECK_MS);
+}
+
+/**
+ * GitHub Releases'taki latest.json'a bakar; yeni sürüm varsa arka planda indirir ve
+ * üst çubukta "Yeniden başlat" bandı gösterir. Kurulum yalnızca kullanıcı isteyince yapılır:
+ * Windows'ta kurulum uygulamayı hemen kapatır, dikte ortasında olmamalı.
+ */
 export async function checkForUpdates(manual: boolean) {
-  if (checking) return;
-  checking = true;
+  if (ready) {
+    if (manual) notify(`Sürüm ${ready.version} indirildi; yeniden başlatınca kurulur.`, "info");
+    return;
+  }
+  if (busy) return;
+  busy = true;
   try {
     const update = await check();
-    if (update) {
-      pending = update;
-      showBanner(update);
-      if (manual) notify(`Yeni sürüm var: ${update.version}`, "info");
-    } else if (manual) {
-      notify("Hilus güncel.", "success");
+    if (!update) {
+      if (manual) notify("Hilus güncel.", "success");
+      return;
     }
+    if (manual) notify(`Yeni sürüm var: ${update.version}; indiriliyor.`, "info");
+    await download(update);
   } catch (err) {
-    if (manual) notify(`Güncelleme denetlenemedi: ${errorText(err)}`, "error");
+    if (manual) notify(`Güncelleme indirilemedi: ${errorText(err)}`, "error");
+    hideBanner();
   } finally {
-    checking = false;
+    busy = false;
   }
 }
 
-function showBanner(update: Update) {
-  const banner = document.getElementById("update-banner")!;
-  banner.hidden = false;
-  banner.replaceChildren(
-    h("span", {}, `Yeni sürüm ${update.version}`),
-    h("button", { class: "btn small primary", onclick: () => void install() }, "Güncelle"),
+async function download(update: Update) {
+  const label = h("span", {}, `Sürüm ${update.version} indiriliyor…`);
+  showBanner(label);
+  let total = 0;
+  let done = 0;
+  await update.download((event) => {
+    if (event.event === "Started") total = event.data.contentLength ?? 0;
+    if (event.event !== "Progress") return;
+    done += event.data.chunkLength;
+    if (total) label.textContent = `Sürüm ${update.version} indiriliyor %${Math.floor((done / total) * 100)}`;
+  });
+  ready = update;
+  showBanner(
+    h("span", {}, `Sürüm ${update.version} hazır`),
+    h("button", { class: "btn small primary", onclick: () => void install() }, "Yeniden başlat"),
   );
 }
 
 async function install() {
-  const update = pending;
+  const update = ready;
   if (!update) return;
-  const message = "Güncelleme uygulamayı yeniden başlatır; açık dikte parçaları ve rapor silinir. Devam edilsin mi?";
-  if (hasSession() && !(await confirmDialog(message, { confirmLabel: "Güncelle" }))) return;
-  const banner = document.getElementById("update-banner")!;
-  const label = h("span", {}, "İndiriliyor…");
-  banner.replaceChildren(label);
-  let total = 0;
-  let done = 0;
+  const message = "Yeniden başlatınca güncelleme kurulur; açık dikte parçaları ve rapor silinir. Devam edilsin mi?";
+  if (hasSession() && !(await confirmDialog(message, { confirmLabel: "Yeniden başlat" }))) return;
+  showBanner(h("span", {}, "Kuruluyor…"));
   try {
-    await update.downloadAndInstall((event) => {
-      if (event.event === "Started") total = event.data.contentLength ?? 0;
-      if (event.event === "Progress") {
-        done += event.data.chunkLength;
-        label.textContent = total ? `İndiriliyor %${Math.floor((done / total) * 100)}` : "İndiriliyor…";
-      }
-      if (event.event === "Finished") label.textContent = "Kuruluyor…";
-    });
+    await update.install();
     await relaunch();
   } catch (err) {
     notify(`Güncelleme kurulamadı: ${errorText(err)}`, "error");
-    showBanner(update);
+    ready = null;
+    hideBanner();
   }
+}
+
+function showBanner(...children: Node[]) {
+  const banner = document.getElementById("update-banner")!;
+  banner.hidden = false;
+  banner.replaceChildren(...children);
+}
+
+function hideBanner() {
+  document.getElementById("update-banner")!.hidden = true;
 }

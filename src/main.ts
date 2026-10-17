@@ -3,9 +3,8 @@ import { api, errorText } from "./api";
 import { h, isTextEditing, renderReport } from "./dom";
 import { AUTO, FREE, buildPrompt, estimateTokens } from "./prompt";
 import { customSelect } from "./select";
-import { checkForUpdates, initUpdater } from "./updater";
+import { checkForUpdates, initUpdater, startAutoUpdates } from "./updater";
 import { initWordEdit, wordText } from "./word-edit";
-import { confirmDialog } from "./dialog";
 import { openReportDialog } from "./report-dialog";
 import { playStart, playStop } from "./sound";
 import { openSettings, settingsOpen } from "./settings-view";
@@ -44,7 +43,7 @@ async function init() {
   });
   initUpdater({ notify: toast, hasSession: () => parts.length > 0 || output !== "" || undoSnapshot !== null });
   await listen("check-updates", () => void checkForUpdates(true));
-  if (settings.autoUpdateCheck) window.setTimeout(() => void checkForUpdates(false), 4000);
+  if (settings.autoUpdateCheck) window.setTimeout(startAutoUpdates, 4000);
   window.addEventListener("keydown", onKeyDown);
   window.addEventListener("keyup", onKeyUp);
   window.addEventListener("blur", () => void stopRecording());
@@ -59,7 +58,7 @@ async function init() {
   $("btn-copy").addEventListener("click", () => void copyReport());
   $("btn-undo").addEventListener("click", undo);
   $("btn-edit").addEventListener("click", toggleEditOutput);
-  $("btn-clear").addEventListener("click", () => void clearSession());
+  $("btn-new").addEventListener("click", newSession);
   $("btn-select-all").addEventListener("click", toggleSelectAll);
   render();
 }
@@ -179,12 +178,20 @@ async function copyReport() {
     toast(errorText(err), "error");
     return;
   }
-  undoSnapshot = { parts: parts.filter((p) => !p.pending), output };
+  toast("Rapor panoya kopyalandı.", "success");
+}
+
+/** Yeni dikte: parçaları ve raporu temizler; son hâli yalnızca bellekte "Geri al" ile döner. */
+function newSession() {
+  syncOutputEditor();
+  const done = parts.filter((p) => !p.pending);
+  if (!done.length && !output) return;
+  undoSnapshot = { parts: done, output };
   parts = parts.filter((p) => p.pending);
   output = "";
   editingOutput = false;
   templateChoice = AUTO;
-  toast("Rapor panoya kopyalandı; oturum temizlendi.", "success");
+  toast("Yeni kayıt açıldı. Önceki dikte “Geri al” ile döner.", "info");
   render();
 }
 
@@ -194,15 +201,6 @@ function undo() {
   output = undoSnapshot.output;
   undoSnapshot = null;
   toast("Son rapor ve parçaları geri getirildi.", "info");
-  render();
-}
-
-async function clearSession() {
-  if (!parts.length && !output) return;
-  if (!(await confirmDialog("Tüm parçalar ve rapor silinsin mi? Geri alınamaz.", { confirmLabel: "Sil", danger: true }))) return;
-  parts = parts.filter((p) => p.pending);
-  output = "";
-  editingOutput = false;
   render();
 }
 
@@ -430,7 +428,7 @@ function renderReportPanel() {
   $<HTMLButtonElement>("btn-edit").disabled = !output.trim() || processing;
   $("btn-edit").textContent = editingOutput ? "Önizle" : "Düzenle";
   $("btn-undo").hidden = !undoSnapshot;
-  $<HTMLButtonElement>("btn-clear").disabled = !parts.length && !output;
+  $<HTMLButtonElement>("btn-new").disabled = !parts.some((p) => !p.pending) && !output;
   if (processing) {
     view.replaceChildren(h("div", { class: "empty" }, h("span", { class: "spinner large" }), h("p", {}, "Rapor hazırlanıyor…")));
     return;
