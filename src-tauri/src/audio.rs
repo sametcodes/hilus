@@ -189,7 +189,7 @@ where
 
 /// Basit yeniden örnekleme: indirgemede kutu filtresi (örtüşmeyi azaltır) +
 /// doğrusal ara değerleme. Konuşma tanıma için yeterli.
-fn resample(input: &[f32], from: u32, to: u32) -> Vec<f32> {
+pub(crate) fn resample(input: &[f32], from: u32, to: u32) -> Vec<f32> {
     if from == to || input.is_empty() {
         return input.to_vec();
     }
@@ -220,4 +220,38 @@ fn resample(input: &[f32], from: u32, to: u32) -> Vec<f32> {
             a + (b - a) * frac
         })
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Kayıt yolunun (kanal ortalaması + `resample`) çıktısını WAV'a yazar; çıktı
+    /// `fallback_compare` ile çözümlenebilir. Çalıştırma:
+    /// HILUS_TEST_RAW=ham.wav HILUS_TEST_OUT=cikti.wav cargo test -- --ignored capture_pipeline
+    #[test]
+    #[ignore]
+    fn capture_pipeline() {
+        let mut reader = hound::WavReader::open(std::env::var("HILUS_TEST_RAW").unwrap()).unwrap();
+        let spec = reader.spec();
+        let channels = spec.channels as usize;
+        let data: Vec<f32> = match spec.sample_format {
+            hound::SampleFormat::Float => reader.samples::<f32>().map(|s| s.unwrap()).collect(),
+            hound::SampleFormat::Int => reader.samples::<i16>().map(|s| s.unwrap() as f32 / 32768.0).collect(),
+        };
+        let mono: Vec<f32> = data.chunks(channels).map(|f| f.iter().sum::<f32>() / f.len() as f32).collect();
+        let out = resample(&mono, spec.sample_rate, TARGET_RATE);
+        let spec_out = hound::WavSpec {
+            channels: 1,
+            sample_rate: TARGET_RATE,
+            bits_per_sample: 16,
+            sample_format: hound::SampleFormat::Int,
+        };
+        let mut writer = hound::WavWriter::create(std::env::var("HILUS_TEST_OUT").unwrap(), spec_out).unwrap();
+        for s in out {
+            writer.write_sample((s.clamp(-1.0, 1.0) * 32767.0) as i16).unwrap();
+        }
+        writer.finalize().unwrap();
+        println!("{} Hz {} kanal → 16 kHz mono", spec.sample_rate, channels);
+    }
 }

@@ -335,9 +335,22 @@ mod tests {
             .into_iter()
             .find_map(|r| find_in_hf_cache(&r))
             .expect("Handy modeli bulunamadı");
+        // HILUS_TEST_BACKEND=cpu: Windows/Linux sürümlerindeki CPU arka ucunu dene.
+        let backend = match std::env::var("HILUS_TEST_BACKEND").as_deref() {
+            Ok("cpu") => transcribe_cpp::Backend::Cpu,
+            _ => transcribe_cpp::Backend::Auto,
+        };
+        let model = Model::load_with(
+            &path,
+            &transcribe_cpp::ModelOptions { backend, ..Default::default() },
+        )
+        .unwrap();
+        println!("arka uç: {}", model.backend());
         let engine = Engine::default();
-        *engine.session.lock().unwrap() = Some(Model::load(&path).unwrap().session().unwrap());
+        *engine.session.lock().unwrap() = Some(model.session().unwrap());
         let prompt = crate::settings::Settings::default().whisper_prompt;
+        let language = std::env::var("HILUS_TEST_LANG").unwrap_or_else(|_| "tr".into());
+        println!("dil: {language}");
         let no_fallback = || {
             Some(RunExtension::Whisper(WhisperRunOptions {
                 temperature_inc: Some(0.0),
@@ -356,7 +369,7 @@ mod tests {
             }
             for (i, (label, family)) in [("açık ", None), ("kapalı", no_fallback())].into_iter().enumerate() {
                 let t0 = std::time::Instant::now();
-                let text = engine.transcribe_with(&pcm, &prompt, "tr", family).unwrap();
+                let text = engine.transcribe_with(&pcm, &prompt, &language, family).unwrap();
                 let secs = t0.elapsed().as_secs_f64();
                 let foreign = has_foreign_letters(&text);
                 totals[i].2 += foreign as usize;
