@@ -65,7 +65,7 @@ impl Engine {
         let _ = app.emit("model-status", status);
     }
 
-    pub fn transcribe(&self, pcm: &[f32], initial_prompt: &str) -> Result<String, String> {
+    pub fn transcribe(&self, pcm: &[f32], initial_prompt: &str, language: &str) -> Result<String, String> {
         let peak = pcm.iter().fold(0f32, |m, s| m.max(s.abs()));
         if pcm.len() < 4_000 || peak < 0.003 {
             return Ok(String::new());
@@ -81,7 +81,7 @@ impl Engine {
         };
         let prompt = initial_prompt.trim();
         let options = RunOptions {
-            language: Some("tr".into()),
+            language: language_hint(language),
             timestamps: TimestampKind::None,
             prompt: (!prompt.is_empty()).then(|| prompt.to_string()),
             ..Default::default()
@@ -94,6 +94,16 @@ impl Engine {
             .run(audio, &options)
             .map_err(|e| format!("Çözümleme hatası: {e}"))?;
         Ok(clean_transcript(&result.text))
+    }
+}
+
+/// Ayardaki dili transcribe.cpp ipucuna çevirir: "auto" → `None` (algıla),
+/// boş → Türkçe, diğerleri olduğu gibi.
+fn language_hint(language: &str) -> Option<String> {
+    match language.trim() {
+        "auto" => None,
+        "" => Some(crate::settings::DEFAULT_WHISPER_LANGUAGE.into()),
+        code => Some(code.to_lowercase()),
     }
 }
 
@@ -244,6 +254,14 @@ async fn download_inner(app: &AppHandle, engine: &Engine) -> Result<PathBuf, Str
 mod tests {
     use super::*;
 
+    #[test]
+    fn dil_ipucu() {
+        assert_eq!(language_hint("tr").as_deref(), Some("tr"));
+        assert_eq!(language_hint("EN").as_deref(), Some("en"));
+        assert_eq!(language_hint(""), Some("tr".into()));
+        assert_eq!(language_hint("auto"), None);
+    }
+
     /// Gerçek modelle uçtan uca çözümleme. Çalıştırma:
     /// HILUS_TEST_WAV=dikte.wav cargo test --release -- --ignored whisper_smoke --nocapture
     #[test]
@@ -266,13 +284,23 @@ mod tests {
         let engine = Engine::default();
         *engine.session.lock().unwrap() = Some(model.session().unwrap());
         let t0 = std::time::Instant::now();
-        let plain = engine.transcribe(&pcm, "").unwrap();
+        let plain = engine.transcribe(&pcm, "", "tr").unwrap();
         println!("bağlamsız ({:?}): {plain}", t0.elapsed());
         let t0 = std::time::Instant::now();
         let prompted = engine
-            .transcribe(&pcm, &crate::settings::Settings::default().whisper_prompt)
+            .transcribe(&pcm, &crate::settings::Settings::default().whisper_prompt, "tr")
             .unwrap();
         println!("bağlamlı ({:?}): {prompted}", t0.elapsed());
+        for lang in ["tr", "auto", "en"] {
+            let options = RunOptions {
+                language: language_hint(lang),
+                timestamps: TimestampKind::None,
+                ..Default::default()
+            };
+            let mut guard = engine.session.lock().unwrap();
+            let r = guard.as_mut().unwrap().run(&pcm, &options).unwrap();
+            println!("dil={lang} (algılanan: {:?}): {}", r.language, r.text.trim());
+        }
         assert!(!plain.is_empty());
     }
 }

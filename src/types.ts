@@ -37,6 +37,8 @@ export interface Settings {
   openaiModel: string;
   openaiKey: string;
   whisperPrompt: string;
+  /** ISO kodu ("tr", "en") ya da "auto". */
+  whisperLanguage: string;
   microphone: string | null;
   autoUpdateCheck: boolean;
   soundFeedback: boolean;

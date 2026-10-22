@@ -58,8 +58,11 @@ fn start_recording(
 #[tauri::command]
 async fn stop_and_transcribe(app: AppHandle) -> Result<String, String> {
     let pcm = app.state::<Recorder>().stop()?;
-    let prompt = app.state::<SettingsStore>().get().whisper_prompt;
-    tauri::async_runtime::spawn_blocking(move || app.state::<Engine>().transcribe(&pcm, &prompt))
+    let settings = app.state::<SettingsStore>().get();
+    tauri::async_runtime::spawn_blocking(move || {
+        app.state::<Engine>()
+            .transcribe(&pcm, &settings.whisper_prompt, &settings.whisper_language)
+    })
         .await
         .map_err(|e| e.to_string())?
 }

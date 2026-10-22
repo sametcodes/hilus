@@ -60,6 +60,8 @@ pub struct Settings {
     pub openai_model: String,
     pub openai_key: String,
     pub whisper_prompt: String,
+    /// Whisper'ın konuşma dili (ISO kodu, ör. "tr", "en") ya da "auto" (otomatik algıla).
+    pub whisper_language: String,
     pub microphone: Option<String>,
     /// Açılışta GitHub Releases'ta yeni sürüm var mı diye bak.
     pub auto_update_check: bool,
@@ -80,6 +82,7 @@ impl Default for Settings {
             openai_model: String::new(),
             openai_key: String::new(),
             whisper_prompt: DEFAULT_WHISPER_PROMPT.into(),
+            whisper_language: DEFAULT_WHISPER_LANGUAGE.into(),
             microphone: None,
             auto_update_check: true,
             sound_feedback: true,
@@ -87,6 +90,8 @@ impl Default for Settings {
         }
     }
 }
+
+pub const DEFAULT_WHISPER_LANGUAGE: &str = "tr";
 
 /// Whisper'a bağlam: talimat değil, doktorun dikte üslubuna benzeyen örnek cümleler.
 const DEFAULT_WHISPER_PROMPT: &str = "Acil toraks BT kontrastsız, klinik nefes darlığı. \
@@ -134,5 +139,23 @@ impl SettingsStore {
         std::fs::rename(&tmp, path).map_err(|e| e.to_string())?;
         *self.current.lock().map_err(|e| e.to_string())? = settings;
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn eski_ayarlarda_dil_yoksa_turkce() {
+        let s: Settings = serde_json::from_str(r#"{"provider":"gemini","whisperPrompt":"x"}"#).unwrap();
+        assert_eq!(s.whisper_language, "tr");
+        assert_eq!(s.provider, "gemini");
+    }
+
+    #[test]
+    fn kayitli_dil_korunur() {
+        let s: Settings = serde_json::from_str(r#"{"whisperLanguage":"auto"}"#).unwrap();
+        assert_eq!(s.whisper_language, "auto");
     }
 }

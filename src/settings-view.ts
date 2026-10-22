@@ -30,6 +30,12 @@ const FALLBACK_MODELS: Record<Provider, SelectOption[]> = {
   openai: [],
 };
 
+const WHISPER_LANGUAGES: SelectOption[] = [
+  { value: "tr", label: "Türkçe", hint: "varsayılan" },
+  { value: "auto", label: "Otomatik algıla" },
+  { value: "en", label: "İngilizce" },
+];
+
 const PROVIDERS: SelectOption[] = [
   { value: "anthropic", label: "Anthropic", hint: "Claude" },
   { value: "gemini", label: "Google Gemini" },
@@ -413,9 +419,12 @@ function whisperTab(s: Settings): Node[] {
   updateCounter();
   const mics: SelectOption[] = [{ value: "", label: "Sistem varsayılanı" }, ...microphones.map((m) => ({ value: m, label: m }))];
   if (s.microphone && !microphones.includes(s.microphone)) mics.push({ value: s.microphone, label: s.microphone, hint: "bağlı değil" });
+  const langs: SelectOption[] = [...WHISPER_LANGUAGES];
+  if (!langs.some((l) => l.value === s.whisperLanguage)) langs.push({ value: s.whisperLanguage, label: s.whisperLanguage });
   return [
     h("h3", {}, "Whisper"),
-    h("p", { class: "hint" }, "Dil sabit: Türkçe. Model: whisper-large-v3-turbo Q8_0 (yerel)."),
+    h("p", { class: "hint" }, "Model: whisper-large-v3-turbo Q8_0 (yerel)."),
+    field("Dikte dili", select(langs, s.whisperLanguage, (v) => (s.whisperLanguage = v)), "Otomatik algılama her kayıtta dili yeniden tahmin eder; kısa ya da terim yoğun diktede yanlış dile kayabilir."),
     field("Başlangıç bağlamı (initial prompt)", ta),
     counter,
     h("p", { class: "hint" }, "Talimat değil, bağlamdır: doktorun dikte üslubuna benzeyen örnek rapor cümleleri ve sık terimler yazın. Whisper bunları “daha önce söylenmiş” sayar ve yazımı onlara yaklaştırır."),
