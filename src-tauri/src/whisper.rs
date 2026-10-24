@@ -8,7 +8,7 @@ use futures_util::StreamExt;
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager};
 use tokio::io::AsyncWriteExt;
-use transcribe_cpp::{Model, RunExtension, RunOptions, Session, TimestampKind};
+use transcribe_cpp::{Model, RunExtension, RunOptions, Session, TimestampKind, WhisperRunOptions};
 
 pub const MODEL_FILE: &str = "whisper-large-v3-turbo-Q8_0.gguf";
 const HF_REPO_DIR: &str = "models--handy-computer--whisper-large-v3-turbo-gguf";
@@ -19,6 +19,7 @@ const HALLUCINATIONS: &[&str] = &[
     "Altyazı M.K.",
     "Altyazı M.K",
     "İzlediğiniz için teşekkürler.",
+    "İzlediğiniz için teşekkür ederim.",
     "Abone olmayı unutmayın.",
 ];
 
@@ -65,8 +66,23 @@ impl Engine {
         let _ = app.emit("model-status", status);
     }
 
-    pub fn transcribe(&self, pcm: &[f32], initial_prompt: &str, language: &str) -> Result<String, String> {
-        self.transcribe_with(pcm, initial_prompt, language, None)
+    /// `strict`: sıcaklık geri dönüşü kapalı (her zaman rastgelesiz çözümleme) ve
+    /// bozuk çıktı reddedilir. Kötü seste geri dönüş rastgele örneklemeye geçip
+    /// başka dilde metin, kapalıyken ise tekrar döngüsü üretebiliyor.
+    pub fn transcribe(&self, pcm: &[f32], initial_prompt: &str, language: &str, strict: bool) -> Result<String, String> {
+        if !strict {
+            return self.transcribe_with(pcm, initial_prompt, language, None);
+        }
+        let family = RunExtension::Whisper(WhisperRunOptions {
+            temperature_inc: Some(0.0),
+            ..Default::default()
+        });
+        let text = self.transcribe_with(pcm, initial_prompt, language, Some(family))?;
+        let foreign = language_hint(language).as_deref() == Some("tr") && has_foreign_letters(&text);
+        if foreign || has_repetition_loop(&text) {
+            return Err("Anlaşılamadı, lütfen tekrar söyleyin.".into());
+        }
+        Ok(text)
     }
 
     /// `family`: Whisper'a özgü çözümleme ayarları (`None` = kütüphane varsayılanı).
@@ -117,6 +133,32 @@ fn language_hint(language: &str) -> Option<String> {
         "" => Some(crate::settings::DEFAULT_WHISPER_LANGUAGE.into()),
         code => Some(code.to_lowercase()),
     }
+}
+
+/// Türkçe alfabede ve noktalamada olmayan harf var mı (ə, ð, Kiril…).
+fn has_foreign_letters(text: &str) -> bool {
+    text.chars()
+        .any(|c| c.is_alphabetic() && !c.is_ascii_alphabetic() && !"çğıöşüâîûÇĞİÖŞÜÂÎÛ".contains(c))
+}
+
+fn normalize_words(text: &str) -> Vec<String> {
+    text.to_lowercase()
+        .replace("i\u{307}", "i") // "İ".to_lowercase() noktalı birleşik i verir
+        .split(|c: char| !c.is_alphanumeric())
+        .filter(|w| !w.is_empty())
+        .map(String::from)
+        .collect()
+}
+
+/// Aynı kelime ya da 2-3 kelimelik kalıp art arda en az 4 kez tekrar ediyor mu.
+fn has_repetition_loop(text: &str) -> bool {
+    let words = normalize_words(text);
+    (1..=3).any(|n| {
+        words.windows(n * 4).any(|w| {
+            let first = &w[..n];
+            w.chunks(n).all(|c| c == first)
+        })
+    })
 }
 
 fn clean_transcript(text: &str) -> String {
@@ -267,6 +309,16 @@ mod tests {
     use super::*;
 
     #[test]
+    fn bozuk_cikti_denetimi() {
+        assert!(has_foreign_letters("başladık sall sécuracaktır"));
+        assert!(has_foreign_letters("Rossvátt gladur hefur"));
+        assert!(!has_foreign_letters("Kranial BT, İskemik değişiklikler. Â"));
+        assert!(has_repetition_loop("Sürapar, atrofi, atrofi, atrofi, atrofi, atrofi"));
+        assert!(has_repetition_loop("lenf nodu lenf nodu lenf nodu lenf nodu"));
+        assert!(!has_repetition_loop("Sol böbrek sol böbrek alt polde kist izlendi."));
+    }
+
+    #[test]
     fn dil_ipucu() {
         assert_eq!(language_hint("tr").as_deref(), Some("tr"));
         assert_eq!(language_hint("EN").as_deref(), Some("en"));
@@ -296,11 +348,11 @@ mod tests {
         let engine = Engine::default();
         *engine.session.lock().unwrap() = Some(model.session().unwrap());
         let t0 = std::time::Instant::now();
-        let plain = engine.transcribe(&pcm, "", "tr").unwrap();
+        let plain = engine.transcribe(&pcm, "", "tr", false).unwrap();
         println!("bağlamsız ({:?}): {plain}", t0.elapsed());
         let t0 = std::time::Instant::now();
         let prompted = engine
-            .transcribe(&pcm, &crate::settings::Settings::default().whisper_prompt, "tr")
+            .transcribe(&pcm, &crate::settings::Settings::default().whisper_prompt, "tr", false)
             .unwrap();
         println!("bağlamlı ({:?}): {prompted}", t0.elapsed());
         for lang in ["tr", "auto", "en"] {
@@ -380,10 +432,12 @@ mod tests {
                     totals[i].1 += words;
                     format!(" WER %{:.0}", 100.0 * errors as f64 / words.max(1) as f64)
                 });
+                let rejected = i == 1 && (foreign || has_repetition_loop(&text));
                 println!(
-                    "   {label} ({secs:.1} sn{}{}): {text}",
+                    "   {label} ({secs:.1} sn{}{}{}): {text}",
                     wer.unwrap_or_default(),
-                    if foreign { " · YABANCI HARF" } else { "" }
+                    if foreign { " · YABANCI HARF" } else { "" },
+                    if rejected { " · kararlı modda → Anlaşılamadı" } else { "" }
                 );
             }
         }
@@ -394,21 +448,6 @@ mod tests {
                 100.0 * errors as f64 / words.max(1) as f64
             );
         }
-    }
-
-    /// Türkçe alfabede ve noktalamada olmayan harf var mı (ə, ð, Kiril…).
-    fn has_foreign_letters(text: &str) -> bool {
-        text.chars()
-            .any(|c| c.is_alphabetic() && !c.is_ascii_alphabetic() && !"çğıöşüâîûÇĞİÖŞÜÂÎÛ".contains(c))
-    }
-
-    fn normalize_words(text: &str) -> Vec<String> {
-        text.to_lowercase()
-            .replace("i\u{307}", "i") // "İ".to_lowercase() noktalı birleşik i verir
-            .split(|c: char| !c.is_alphanumeric())
-            .filter(|w| !w.is_empty())
-            .map(String::from)
-            .collect()
     }
 
     /// Kelime düzeyinde düzenleme uzaklığı: (hata sayısı, referans kelime sayısı).

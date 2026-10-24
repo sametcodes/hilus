@@ -62,6 +62,9 @@ pub struct Settings {
     pub whisper_prompt: String,
     /// Whisper'ın konuşma dili (ISO kodu, ör. "tr", "en") ya da "auto" (otomatik algıla).
     pub whisper_language: String,
+    /// Kararlı çözümleme: sıcaklık geri dönüşü kapalı; yabancı harfli ya da
+    /// tekrar döngüsüne giren çıktı "Anlaşılamadı" hatası olur.
+    pub whisper_strict: bool,
     pub microphone: Option<String>,
     /// Açılışta GitHub Releases'ta yeni sürüm var mı diye bak.
     pub auto_update_check: bool,
@@ -83,6 +86,7 @@ impl Default for Settings {
             openai_key: String::new(),
             whisper_prompt: DEFAULT_WHISPER_PROMPT.into(),
             whisper_language: DEFAULT_WHISPER_LANGUAGE.into(),
+            whisper_strict: false,
             microphone: None,
             auto_update_check: true,
             sound_feedback: true,
@@ -150,6 +154,7 @@ mod tests {
     fn eski_ayarlarda_dil_yoksa_turkce() {
         let s: Settings = serde_json::from_str(r#"{"provider":"gemini","whisperPrompt":"x"}"#).unwrap();
         assert_eq!(s.whisper_language, "tr");
+        assert!(!s.whisper_strict);
         assert_eq!(s.provider, "gemini");
     }
 

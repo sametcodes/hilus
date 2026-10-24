@@ -39,6 +39,7 @@ export interface Settings {
   whisperPrompt: string;
   /** ISO kodu ("tr", "en") ya da "auto". */
   whisperLanguage: string;
+  whisperStrict: boolean;
   microphone: string | null;
   autoUpdateCheck: boolean;
   soundFeedback: boolean;

@@ -428,6 +428,8 @@ function whisperTab(s: Settings): Node[] {
     field("Başlangıç bağlamı (initial prompt)", ta),
     counter,
     h("p", { class: "hint" }, "Talimat değil, bağlamdır: doktorun dikte üslubuna benzeyen örnek rapor cümleleri ve sık terimler yazın. Whisper bunları “daha önce söylenmiş” sayar ve yazımı onlara yaklaştırır."),
+    h("label", { class: "check-row" }, checkbox(s.whisperStrict, (v) => (s.whisperStrict = v)), h("span", {}, "Kararlı çözümleme (deneysel)")),
+    h("p", { class: "hint" }, "Her parça tek seferde, rastgelelik olmadan çözümlenir; kısık ya da gürültülü seste başka dilde metin yerine “Anlaşılamadı” uyarısı çıkar ve parça eklenmez. Kötü seste daha hızlıdır; nadiren, varsayılan modun ikinci denemede kurtardığı bir parçayı tekrar söylemeniz gerekebilir."),
     h("label", { class: "check-row" }, checkbox(s.soundFeedback, (v) => (s.soundFeedback = v)), h("span", {}, "Kayıt başlarken ve biterken kısa ses çal")),
     h("h3", {}, "Mikrofon"),
     field("Giriş aygıtı", select(mics, s.microphone ?? "", (v) => (s.microphone = v || null))),
