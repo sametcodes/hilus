@@ -68,7 +68,7 @@ async fn stop_and_transcribe(app: AppHandle) -> Result<String, String> {
 }
 
 #[tauri::command]
-async fn process_report(app: AppHandle, prompt: String) -> Result<String, String> {
+async fn process_report(app: AppHandle, prompt: String) -> Result<llm::Completion, String> {
     let settings = app.state::<SettingsStore>().get();
     llm::complete(&settings, &prompt).await
 }

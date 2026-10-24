@@ -47,6 +47,15 @@ impl Default for PromptConfig {
     }
 }
 
+/// Rapor için denenecek bir model. Anahtar ve adres sağlayıcının kendi alanlarından gelir.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ModelChoice {
+    /// "anthropic" | "gemini" | "openai"
+    pub provider: String,
+    pub model: String,
+}
+
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 pub struct Settings {
@@ -59,6 +68,9 @@ pub struct Settings {
     pub openai_base_url: String,
     pub openai_model: String,
     pub openai_key: String,
+    /// İşle'de sırayla denenecek modeller; biri hata verirse sıradakine geçilir.
+    /// Boşsa yalnızca `provider` ve onun model alanı kullanılır (eski ayarlar).
+    pub model_chain: Vec<ModelChoice>,
     pub whisper_prompt: String,
     /// Whisper'ın konuşma dili (ISO kodu, ör. "tr", "en") ya da "auto" (otomatik algıla).
     pub whisper_language: String,
@@ -84,6 +96,7 @@ impl Default for Settings {
             openai_base_url: "https://api.openai.com/v1".into(),
             openai_model: String::new(),
             openai_key: String::new(),
+            model_chain: Vec::new(),
             whisper_prompt: DEFAULT_WHISPER_PROMPT.into(),
             whisper_language: DEFAULT_WHISPER_LANGUAGE.into(),
             whisper_strict: false,
@@ -96,6 +109,30 @@ impl Default for Settings {
 }
 
 pub const DEFAULT_WHISPER_LANGUAGE: &str = "tr";
+
+impl Settings {
+    /// Denenecek modeller, sırasıyla. Modeli boş satırlar atlanır.
+    pub fn chain(&self) -> Vec<ModelChoice> {
+        let chain: Vec<ModelChoice> = self
+            .model_chain
+            .iter()
+            .filter(|c| !c.model.trim().is_empty())
+            .cloned()
+            .collect();
+        if !chain.is_empty() {
+            return chain;
+        }
+        let model = match self.provider.as_str() {
+            "gemini" => &self.gemini_model,
+            "openai" => &self.openai_model,
+            _ => &self.anthropic_model,
+        };
+        vec![ModelChoice {
+            provider: self.provider.clone(),
+            model: model.clone(),
+        }]
+    }
+}
 
 /// Whisper'a bağlam: talimat değil, doktorun dikte üslubuna benzeyen örnek cümleler.
 const DEFAULT_WHISPER_PROMPT: &str = "Acil toraks BT kontrastsız, klinik nefes darlığı. \
@@ -156,6 +193,25 @@ mod tests {
         assert_eq!(s.whisper_language, "tr");
         assert!(!s.whisper_strict);
         assert_eq!(s.provider, "gemini");
+    }
+
+    #[test]
+    fn zincir_yoksa_eski_saglayici() {
+        let s: Settings = serde_json::from_str(r#"{"provider":"gemini","geminiModel":"gemini-2.5-flash"}"#).unwrap();
+        assert_eq!(
+            s.chain(),
+            vec![ModelChoice { provider: "gemini".into(), model: "gemini-2.5-flash".into() }]
+        );
+    }
+
+    #[test]
+    fn zincir_sirasi_korunur_bos_model_atlanir() {
+        let s: Settings = serde_json::from_str(
+            r#"{"modelChain":[{"provider":"gemini","model":"gemini-2.5-flash"},{"provider":"openai","model":" "},{"provider":"anthropic","model":"claude-haiku-5-5"}]}"#,
+        )
+        .unwrap();
+        let providers: Vec<_> = s.chain().into_iter().map(|c| c.provider).collect();
+        assert_eq!(providers, ["gemini", "anthropic"]);
     }
 
     #[test]

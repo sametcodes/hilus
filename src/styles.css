@@ -590,6 +590,7 @@ textarea.mono {
   bottom: 22px;
   transform: translate(-50%, 20px);
   max-width: min(640px, 90vw);
+  white-space: pre-line;
   padding: 10px 16px;
   border-radius: 9px;
   background: var(--accent);
@@ -988,6 +989,50 @@ textarea.preview {
 
 .keys-hint {
   font-size: 12px;
+}
+
+.chain-items {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.chain-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  border-radius: 7px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.chain-item .grip {
+  cursor: grab;
+  touch-action: none;
+  padding: 4px 2px;
+}
+
+.chain-item.dragging {
+  border-color: var(--accent-2);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.15);
+  position: relative;
+  z-index: 1;
+}
+
+.chain-item.dragging .grip {
+  cursor: grabbing;
+}
+
+.chain-provider {
+  width: 170px;
+  flex: none;
+}
+
+.chain-model {
+  flex: 1;
+  min-width: 0;
 }
 
 .model-slot .field {

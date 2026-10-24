@@ -2,10 +2,17 @@
  * İşaretçi (pointer) olaylarıyla sürükle-bırak sıralama. HTML5 drag & drop yerine bu yol
  * seçildi: Windows WebView2'de Tauri'nin dosya bırakma işleyicisiyle çakışmaz.
  * Küçük hareketler tıklama sayılır; 4 pikseli aşan hareket sürüklemeyi başlatır.
+ * `handleSelector` verilirse sürükleme yalnızca o tutamaçtan başlar (satırda alan varsa).
  */
-export function enableDragSort(container: HTMLElement, itemSelector: string, onMove: (from: number, to: number) => void) {
+export function enableDragSort(
+  container: HTMLElement,
+  itemSelector: string,
+  onMove: (from: number, to: number) => void,
+  handleSelector?: string,
+) {
   container.addEventListener("pointerdown", (down) => {
     if (down.button !== 0) return;
+    if (handleSelector && !(down.target as HTMLElement).closest(handleSelector)) return;
     const item = (down.target as HTMLElement).closest<HTMLElement>(itemSelector);
     if (!item || !container.contains(item)) return;
     const items = () => Array.from(container.querySelectorAll<HTMLElement>(itemSelector));

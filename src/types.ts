@@ -27,7 +27,22 @@ export interface PromptConfig {
 
 export type Provider = "anthropic" | "gemini" | "openai";
 
+/** Rapor için denenecek bir model; anahtarı sağlayıcının kendi alanından gelir. */
+export interface ModelChoice {
+  provider: Provider;
+  model: string;
+}
+
+/** İşle'nin sonucu: metin, onu yazan model ve önceki modellerin hataları. */
+export interface Completion {
+  text: string;
+  provider: Provider;
+  model: string;
+  failures: string[];
+}
+
 export interface Settings {
+  /** Eski tek sağlayıcı alanı; kaydederken model sırasının ilkiyle eşitlenir. */
   provider: Provider;
   anthropicModel: string;
   anthropicKey: string;
@@ -36,6 +51,8 @@ export interface Settings {
   openaiBaseUrl: string;
   openaiModel: string;
   openaiKey: string;
+  /** İşle'de sırayla denenen modeller; biri hata verirse sıradakine geçilir. */
+  modelChain: ModelChoice[];
   whisperPrompt: string;
   /** ISO kodu ("tr", "en") ya da "auto". */
   whisperLanguage: string;

@@ -4,50 +4,91 @@ use std::time::Duration;
 
 use serde_json::{json, Value};
 
-use crate::settings::Settings;
+use crate::settings::{ModelChoice, Settings};
 
 const ANTHROPIC_URL: &str = "https://api.anthropic.com/v1/messages";
 const GEMINI_BASE_URL: &str = "https://generativelanguage.googleapis.com/v1beta/openai";
 const MAX_TOKENS: u32 = 16_000;
 
-pub async fn complete(settings: &Settings, prompt: &str) -> Result<String, String> {
+/// Başarılı rapor yanıtı: metin, onu yazan model ve önceki denemelerin hataları.
+#[derive(Debug, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Completion {
+    pub text: String,
+    pub provider: String,
+    pub model: String,
+    pub failures: Vec<String>,
+}
+
+/// Zincirdeki modelleri sırayla dener; ilk başarılı yanıtı döndürür. Hangi hata
+/// olursa olsun (kota, bağlantı, anahtar, sunucu) sıradaki modele geçilir.
+pub async fn complete(settings: &Settings, prompt: &str) -> Result<Completion, String> {
     let client = reqwest::Client::builder()
         .timeout(Duration::from_secs(180))
         .build()
         .map_err(|e| e.to_string())?;
-    match settings.provider.as_str() {
+    let mut failures = Vec::new();
+    for choice in settings.chain() {
+        match complete_one(&client, settings, &choice, prompt).await {
+            Ok(text) => {
+                return Ok(Completion {
+                    text,
+                    provider: choice.provider,
+                    model: choice.model,
+                    failures,
+                })
+            }
+            Err(e) => failures.push(format!("{}: {e}", choice_label(&choice))),
+        }
+    }
+    Err(match failures.as_slice() {
+        [only] => only.clone(),
+        all => format!("Sıradaki modellerin hiçbiri yanıt veremedi:\n{}", all.join("\n")),
+    })
+}
+
+fn choice_label(choice: &ModelChoice) -> String {
+    let provider = match choice.provider.as_str() {
+        "gemini" => "Gemini",
+        "openai" => "OpenAI-uyumlu",
+        _ => "Anthropic",
+    };
+    format!("{provider} · {}", choice.model.trim())
+}
+
+async fn complete_one(
+    client: &reqwest::Client,
+    settings: &Settings,
+    choice: &ModelChoice,
+    prompt: &str,
+) -> Result<String, String> {
+    match choice.provider.as_str() {
         "gemini" => {
-            openai_compatible(
-                &client,
-                GEMINI_BASE_URL,
-                &settings.gemini_key,
-                &settings.gemini_model,
-                prompt,
-            )
-            .await
+            openai_compatible(client, GEMINI_BASE_URL, &settings.gemini_key, &choice.model, prompt).await
         }
         "openai" => {
             openai_compatible(
-                &client,
+                client,
                 &settings.openai_base_url,
                 &settings.openai_key,
-                &settings.openai_model,
+                &choice.model,
                 prompt,
             )
             .await
         }
-        _ => anthropic(&client, settings, prompt).await,
+        _ => anthropic(client, &settings.anthropic_key, &choice.model, prompt).await,
     }
 }
 
 async fn anthropic(
     client: &reqwest::Client,
-    settings: &Settings,
+    key: &str,
+    model: &str,
     prompt: &str,
 ) -> Result<String, String> {
-    require(&settings.anthropic_key, "Anthropic API anahtarı")?;
-    require(&settings.anthropic_model, "Anthropic modeli")?;
-    let model = settings.anthropic_model.trim();
+    require(key, "Anthropic API anahtarı")?;
+    require(model, "Anthropic modeli")?;
+    let model = model.trim();
     let mut body = json!({
         "model": model,
         "max_tokens": MAX_TOKENS,
@@ -55,7 +96,7 @@ async fn anthropic(
     });
     let mut request = client
         .post(ANTHROPIC_URL)
-        .header("x-api-key", settings.anthropic_key.trim())
+        .header("x-api-key", key.trim())
         .header("anthropic-version", "2023-06-01");
     // Sonnet 5.5 güvenlik sınıflandırıcısı reddederse sunucu tarafı yedek modele düşsün.
     if model == "claude-sonnet-5-5" {
@@ -215,4 +256,60 @@ fn parse_models(value: &Value, label_key: &str, keep: impl Fn(&str) -> bool) -> 
     }
     models.dedup_by(|a, b| a.id == b.id);
     models
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::{Read, Write};
+
+    /// Tek isteğe sabit bir sohbet yanıtı veren yerel sahte sunucu; adresini döndürür.
+    fn fake_server(status: &'static str, body: &'static str) -> String {
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = listener.local_addr().unwrap();
+        std::thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            let mut buf = [0u8; 65536];
+            let _ = stream.read(&mut buf);
+            let response = format!(
+                "HTTP/1.1 {status}\r\ncontent-type: application/json\r\ncontent-length: {}\r\nconnection: close\r\n\r\n{body}",
+                body.len()
+            );
+            stream.write_all(response.as_bytes()).unwrap();
+        });
+        format!("http://{addr}/v1")
+    }
+
+    fn settings_with(chain: &[(&str, &str)], openai_base_url: String) -> Settings {
+        Settings {
+            openai_base_url,
+            openai_key: "test".into(),
+            model_chain: chain
+                .iter()
+                .map(|(p, m)| ModelChoice { provider: p.to_string(), model: m.to_string() })
+                .collect(),
+            ..Settings::default()
+        }
+    }
+
+    #[test]
+    fn hata_verince_siradaki_modele_gecer() {
+        let base = fake_server("200 OK", r#"{"choices":[{"message":{"content":"RAPOR"}}]}"#);
+        // Gemini anahtarı boş: ilk model hata verir, ikinci (sahte sunucu) yazar.
+        let settings = settings_with(&[("gemini", "gemini-2.5-flash"), ("openai", "yedek-model")], base);
+        let result = tauri::async_runtime::block_on(complete(&settings, "x")).unwrap();
+        assert_eq!(result.text, "RAPOR");
+        assert_eq!(result.model, "yedek-model");
+        assert_eq!(result.failures.len(), 1);
+        assert!(result.failures[0].starts_with("Gemini · gemini-2.5-flash:"));
+    }
+
+    #[test]
+    fn hepsi_basarisizsa_tum_hatalar_listelenir() {
+        let base = fake_server("429 Too Many Requests", r#"{"error":{"message":"quota"}}"#);
+        let settings = settings_with(&[("openai", "a"), ("gemini", "b")], base);
+        let err = tauri::async_runtime::block_on(complete(&settings, "x")).unwrap_err();
+        assert!(err.contains("OpenAI-uyumlu · a: 429"), "{err}");
+        assert!(err.contains("Gemini · b:"), "{err}");
+    }
 }

@@ -131,9 +131,10 @@ async function stopRecording() {
 function reportDetails(): Record<string, string> {
   const whisper = modelStatus.state === "ready" ? `hazır (${backendLabel(modelStatus.backend)})` : modelStatus.state;
   const model = { anthropic: settings.anthropicModel, gemini: settings.geminiModel, openai: settings.openaiModel }[settings.provider];
+  const chain = settings.modelChain?.length ? settings.modelChain : [{ provider: settings.provider, model }];
   return {
     Whisper: whisper,
-    "LLM sağlayıcısı": `${settings.provider} · ${model || "?"}`,
+    "LLM model sırası": chain.map((c) => `${c.provider} · ${c.model || "?"}`).join(" → "),
     "Şablon seçimi": templateChoice,
     "Şablon sayısı": String(settings.prompt.templates.length),
     "Parça sayısı": String(parts.length),
@@ -160,7 +161,12 @@ async function processParts() {
   editingOutput = false;
   render();
   try {
-    output = await api.processReport(buildPrompt(settings.prompt, transcript, templateChoice));
+    const result = await api.processReport(buildPrompt(settings.prompt, transcript, templateChoice));
+    output = result.text;
+    // Yedek bir model yazdıysa hangisinin, neden yazdığını söyle.
+    if (result.failures.length) {
+      toast(`${result.failures.join("\n")}\nRapor sıradaki modelle yazıldı: ${result.model}.`, "info");
+    }
   } catch (err) {
     toast(errorText(err), "error");
   } finally {
@@ -462,7 +468,9 @@ function toast(message: string, kind: "info" | "error" | "success") {
   el.dataset.kind = kind;
   el.classList.add("show");
   window.clearTimeout(toastTimer);
-  toastTimer = window.setTimeout(() => el.classList.remove("show"), kind === "error" ? 7000 : 3200);
+  // Uzun mesajlar (ör. yedek modele geçiş nedeni) okunacak kadar kalsın.
+  const base = kind === "error" ? 7000 : 3200;
+  toastTimer = window.setTimeout(() => el.classList.remove("show"), Math.min(12000, Math.max(base, message.length * 60)));
 }
 
 void init();
