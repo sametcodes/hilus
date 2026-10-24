@@ -1,6 +1,6 @@
 [package]
 name = "hilus"
-version = "0.1.4"
+version = "0.1.5"
 description = "Radyoloji dikte toplayıcı: parça parça dikte, tek seferde LLM ile rapor"
 edition = "2021"
 rust-version = "1.85"
