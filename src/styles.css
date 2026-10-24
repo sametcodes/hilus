@@ -999,12 +999,32 @@ textarea.preview {
 }
 
 .chain-empty {
-  padding: 14px;
-  margin: 0 0 10px;
+  margin: 0 0 8px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.chain-add {
+  display: block;
+  width: 100%;
+  font: inherit;
+  font-size: 13px;
+  padding: 8px;
   border: 1px dashed var(--border);
   border-radius: 9px;
+  background: transparent;
   color: var(--muted);
-  text-align: center;
+  cursor: pointer;
+}
+
+.chain-add:hover {
+  border-color: var(--accent-2);
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.chain-note {
+  margin-top: 12px;
 }
 
 /* Kart: [tutamaç + sıra] [alanlar] [sil]. Yan öğeler ilk satırın ortasına hizalı. */

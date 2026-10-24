@@ -250,10 +250,10 @@ function aiTab(s: Settings): Node[] {
   enableDragSort(items, ".chain-item", move, ".grip");
   const out: Node[] = [
     h("h3", {}, "Model sırası"),
-    h("p", { class: "hint" }, "“İşle” önce 1. modeli dener. Hata verirse (kota dolması, bağlantı, anahtar ya da sunucu hatası) sıradakine geçer. Her satırın kendi anahtarı var; aynı modeli farklı anahtarlarla (ör. farklı harcama sınırlarıyla) birden fazla kez ekleyebilirsiniz. Sıralamak için ⠿ tutamacından sürükleyin."),
-    chain.length ? items : h("p", { class: "chain-empty" }, "Henüz model yok. “İşle”nin çalışması için en az bir model ekleyin."),
-    h("div", {}, h("button", { class: "btn small", onclick: add }, "+ Model ekle")),
-    h("p", { class: "hint" }, "Anahtarlar bu bilgisayardaki ayar dosyasında düz metin olarak saklanır. Kayıt sırasında hiçbir LLM çağrısı yapılmaz; yalnızca “İşle” istek gönderir."),
+    h("p", { class: "hint" }, "“İşle” modelleri yukarıdan aşağı dener; biri hata verirse (kota, bağlantı, anahtar, sunucu) sıradakine geçer. Aynı model farklı anahtarlarla birden fazla kez eklenebilir."),
+    chain.length ? items : h("p", { class: "chain-empty" }, "Henüz model yok; “İşle” için en az bir model ekleyin."),
+    h("button", { class: "chain-add", onclick: add }, "+ Model ekle"),
+    h("p", { class: "hint chain-note" }, "Anahtarlar bu bilgisayardaki ayar dosyasında düz metin olarak saklanır. Kaydetmek hiçbir istek göndermez; yalnızca “İşle” gönderir."),
   ];
   for (const entry of modelSlots) renderModelSlot(entry);
   for (const c of chain) if (c.apiKey.trim() && !modelLists.has(listKey(c))) void fetchModels(c);
@@ -317,7 +317,7 @@ function chainRow(s: Settings, c: ModelChoice, i: number): HTMLElement {
     h(
       "div",
       { class: "chain-side" },
-      h("span", { class: "grip", title: "Sıralamak için sürükleyin", "aria-hidden": "true" }, "⠿"),
+      h("span", { class: "grip", title: "Sıralamak için sürükleyin" }, "⠿"),
       h("span", { class: "chain-no", title: `${i + 1}. sırada denenir` }, String(i + 1)),
     ),
     h("div", { class: "chain-fields" }, ...lines, status),
