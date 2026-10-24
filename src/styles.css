@@ -998,6 +998,15 @@ textarea.preview {
   margin-bottom: 8px;
 }
 
+.chain-empty {
+  padding: 14px;
+  margin: 0 0 8px;
+  border: 1px dashed var(--border);
+  border-radius: 7px;
+  color: var(--muted);
+  text-align: center;
+}
+
 .chain-item {
   display: flex;
   align-items: flex-start;

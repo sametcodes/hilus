@@ -27,8 +27,12 @@ pub async fn complete(settings: &Settings, prompt: &str) -> Result<Completion, S
         .timeout(Duration::from_secs(180))
         .build()
         .map_err(|e| e.to_string())?;
+    let chain = settings.chain();
+    if chain.is_empty() {
+        return Err("Model sırası boş: Ayarlar > Yapay zekâ'dan en az bir model ekleyin.".into());
+    }
     let mut failures = Vec::new();
-    for (i, choice) in settings.chain().into_iter().enumerate() {
+    for (i, choice) in chain.into_iter().enumerate() {
         match complete_one(&client, &choice, prompt).await {
             Ok(text) => {
                 return Ok(Completion {
@@ -270,7 +274,7 @@ mod tests {
 
     fn settings_with(chain: &[(&str, &str)], openai_base_url: String) -> Settings {
         Settings {
-            model_chain: chain
+            model_chain: Some(chain
                 .iter()
                 .map(|(p, m)| ModelChoice {
                     provider: p.to_string(),
@@ -278,7 +282,7 @@ mod tests {
                     api_key: if *p == "openai" { "test".into() } else { String::new() },
                     base_url: openai_base_url.clone(),
                 })
-                .collect(),
+                .collect()),
             ..Settings::default()
         }
     }
@@ -293,6 +297,12 @@ mod tests {
         assert_eq!(result.model, "yedek-model");
         assert_eq!(result.failures.len(), 1);
         assert!(result.failures[0].starts_with("1. Gemini · gemini-2.5-flash:"));
+    }
+
+    #[test]
+    fn model_yoksa_anlasilir_hata() {
+        let err = tauri::async_runtime::block_on(complete(&Settings::default(), "x")).unwrap_err();
+        assert!(err.contains("en az bir model"), "{err}");
     }
 
     #[test]

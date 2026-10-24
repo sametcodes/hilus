@@ -74,8 +74,10 @@ pub struct Settings {
     pub openai_model: String,
     pub openai_key: String,
     /// İşle'de sırayla denenecek modeller; biri hata verirse sıradakine geçilir.
-    /// Boşsa yalnızca `provider` ve onun model alanı kullanılır (eski ayarlar).
-    pub model_chain: Vec<ModelChoice>,
+    /// `None` = bu alanı tanımayan eski bir ayar dosyası: anahtarı girilmiş eski
+    /// tek sağlayıcı ayarı sıranın tek satırı olur. Yeni kurulumda sıra boştur.
+    #[serde(default)]
+    pub model_chain: Option<Vec<ModelChoice>>,
     pub whisper_prompt: String,
     /// Whisper'ın konuşma dili (ISO kodu, ör. "tr", "en") ya da "auto" (otomatik algıla).
     pub whisper_language: String,
@@ -101,7 +103,7 @@ impl Default for Settings {
             openai_base_url: "https://api.openai.com/v1".into(),
             openai_model: String::new(),
             openai_key: String::new(),
-            model_chain: Vec::new(),
+            model_chain: Some(Vec::new()),
             whisper_prompt: DEFAULT_WHISPER_PROMPT.into(),
             whisper_language: DEFAULT_WHISPER_LANGUAGE.into(),
             whisper_strict: false,
@@ -116,27 +118,33 @@ impl Default for Settings {
 pub const DEFAULT_WHISPER_LANGUAGE: &str = "tr";
 
 impl Settings {
-    /// Denenecek modeller, sırasıyla. Modeli boş satırlar atlanır.
+    /// Denenecek modeller, sırasıyla. Modeli boş satırlar atlanır; boş olabilir.
     pub fn chain(&self) -> Vec<ModelChoice> {
-        let chain: Vec<ModelChoice> = self
-            .model_chain
+        let Some(chain) = &self.model_chain else {
+            return self.legacy_choice().into_iter().collect();
+        };
+        chain
             .iter()
             .filter(|c| !c.model.trim().is_empty())
             .map(|c| self.with_shared_credentials(c.clone()))
-            .collect();
-        if !chain.is_empty() {
-            return chain;
-        }
-        let model = match self.provider.as_str() {
-            "gemini" => &self.gemini_model,
-            "openai" => &self.openai_model,
-            _ => &self.anthropic_model,
+            .collect()
+    }
+
+    /// Eski ayar dosyasındaki tek sağlayıcı, anahtarı girilmişse.
+    fn legacy_choice(&self) -> Option<ModelChoice> {
+        let (model, key) = match self.provider.as_str() {
+            "gemini" => (&self.gemini_model, &self.gemini_key),
+            "openai" => (&self.openai_model, &self.openai_key),
+            _ => (&self.anthropic_model, &self.anthropic_key),
         };
-        vec![self.with_shared_credentials(ModelChoice {
+        if key.trim().is_empty() || model.trim().is_empty() {
+            return None;
+        }
+        Some(self.with_shared_credentials(ModelChoice {
             provider: self.provider.clone(),
             model: model.clone(),
             ..Default::default()
-        })]
+        }))
     }
 
     /// Satırın boş anahtar/adres alanlarını sağlayıcının ortak alanlarıyla doldurur.
@@ -218,8 +226,19 @@ mod tests {
     }
 
     #[test]
+    fn yeni_kurulumda_model_yok() {
+        assert!(Settings::default().chain().is_empty());
+        let s: Settings = serde_json::from_str(r#"{"modelChain":[]}"#).unwrap();
+        assert!(s.chain().is_empty());
+        // Eski dosya ama anahtar hiç girilmemiş: taşınacak bir şey yok.
+        let s: Settings = serde_json::from_str(r#"{"provider":"anthropic"}"#).unwrap();
+        assert!(s.chain().is_empty());
+    }
+
+    #[test]
     fn zincir_yoksa_eski_saglayici() {
-        let s: Settings = serde_json::from_str(r#"{"provider":"gemini","geminiModel":"gemini-2.5-flash"}"#).unwrap();
+        let s: Settings =
+            serde_json::from_str(r#"{"provider":"gemini","geminiModel":"gemini-2.5-flash","geminiKey":"k"}"#).unwrap();
         let chain = s.chain();
         assert_eq!(chain.len(), 1);
         assert_eq!((chain[0].provider.as_str(), chain[0].model.as_str()), ("gemini", "gemini-2.5-flash"));

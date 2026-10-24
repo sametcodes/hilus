@@ -54,8 +54,8 @@ export interface Settings {
   openaiBaseUrl: string;
   openaiModel: string;
   openaiKey: string;
-  /** İşle'de sırayla denenen modeller; biri hata verirse sıradakine geçilir. */
-  modelChain: ModelChoice[];
+  /** İşle'de sırayla denenen modeller; biri hata verirse sıradakine geçilir. null = alanı tanımayan eski ayar dosyası. */
+  modelChain: ModelChoice[] | null;
   whisperPrompt: string;
   /** ISO kodu ("tr", "en") ya da "auto". */
   whisperLanguage: string;

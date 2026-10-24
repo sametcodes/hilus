@@ -74,7 +74,11 @@ export function settingsOpen(): boolean {
 
 export function openSettings(current: Settings, saved: (s: Settings) => void) {
   draft = structuredClone(current);
-  if (!draft.modelChain?.length) draft.modelChain = [{ provider: draft.provider, model: modelOf(draft, draft.provider), apiKey: "", baseUrl: "" }];
+  // Eski ayar dosyası: anahtarı girilmiş tek sağlayıcı sıranın ilk satırı olur (arka uç da aynısını yapar).
+  if (!draft.modelChain) {
+    const legacy = { provider: draft.provider, model: modelOf(draft, draft.provider), apiKey: "", baseUrl: "" };
+    draft.modelChain = keyOf(draft, legacy.provider).trim() && legacy.model.trim() ? [legacy] : [];
+  }
   // Anahtarı/adresi boş satırlar eski ortak alanlardan doldurulur (arka uç da aynısını yapar).
   for (const c of draft.modelChain) {
     if (!c.apiKey?.trim()) c.apiKey = keyOf(draft, c.provider);
@@ -102,7 +106,7 @@ function close() {
 async function save() {
   if (!draft) return;
   // Eski tek sağlayıcı alanları sıranın ilkini göstersin (sorun bildirimi vb.).
-  draft.modelChain = draft.modelChain.filter((c) => c.model.trim());
+  draft.modelChain = (draft.modelChain ?? []).filter((c) => c.model.trim());
   const first = draft.modelChain[0];
   if (first) {
     draft.provider = first.provider;
@@ -209,7 +213,7 @@ function select(options: SelectOption[], value: string, set: (v: string) => void
 // ---------- Sekmeler ----------
 
 function aiTab(s: Settings): Node[] {
-  const chain = s.modelChain;
+  const chain = (s.modelChain ??= []);
   modelSlots = [];
   const move = (from: number, to: number) => {
     const [c] = chain.splice(from, 1);
@@ -225,7 +229,7 @@ function aiTab(s: Settings): Node[] {
   const out: Node[] = [
     h("h3", {}, "Model sırası"),
     h("p", { class: "hint" }, "“İşle” önce 1. modeli dener. Hata verirse (kota dolması, bağlantı, anahtar ya da sunucu hatası) sıradakine geçer. Her satırın kendi anahtarı var; aynı modeli farklı anahtarlarla (ör. farklı harcama sınırlarıyla) birden fazla kez ekleyebilirsiniz. Sıralamak için ⠿ tutamacından sürükleyin."),
-    items,
+    chain.length ? items : h("p", { class: "chain-empty" }, "Henüz model yok. “İşle”nin çalışması için en az bir model ekleyin."),
     h("div", {}, h("button", { class: "btn small", onclick: add }, "+ Model ekle")),
     h("p", { class: "hint" }, "Anahtarlar bu bilgisayardaki ayar dosyasında düz metin olarak saklanır. Kayıt sırasında hiçbir LLM çağrısı yapılmaz; yalnızca “İşle” istek gönderir."),
   ];
@@ -251,7 +255,7 @@ function chainRow(s: Settings, c: ModelChoice, i: number): HTMLElement {
       c.provider = v as Provider;
       c.model = FALLBACK_MODELS[c.provider][0]?.value ?? "";
       // Aynı sağlayıcının başka satırında anahtar varsa onu öner.
-      c.apiKey = s.modelChain.find((o) => o !== c && o.provider === c.provider)?.apiKey ?? "";
+      c.apiKey = s.modelChain?.find((o) => o !== c && o.provider === c.provider)?.apiKey ?? "";
       if (c.provider === "openai" && !c.baseUrl) c.baseUrl = s.openaiBaseUrl;
       render();
     },
@@ -278,9 +282,9 @@ function chainRow(s: Settings, c: ModelChoice, i: number): HTMLElement {
     lines.push(base);
   }
   lines.push(key);
-  const remove = h("button", { class: "icon-btn danger", title: "Sıradan çıkar", disabled: s.modelChain.length === 1 }, "✕");
+  const remove = h("button", { class: "icon-btn danger", title: "Sıradan çıkar" }, "✕");
   remove.addEventListener("click", () => {
-    s.modelChain.splice(s.modelChain.indexOf(c), 1);
+    s.modelChain?.splice(s.modelChain.indexOf(c), 1);
     render();
   });
   return h(

@@ -131,10 +131,10 @@ async function stopRecording() {
 function reportDetails(): Record<string, string> {
   const whisper = modelStatus.state === "ready" ? `hazır (${backendLabel(modelStatus.backend)})` : modelStatus.state;
   const model = { anthropic: settings.anthropicModel, gemini: settings.geminiModel, openai: settings.openaiModel }[settings.provider];
-  const chain = settings.modelChain?.length ? settings.modelChain : [{ provider: settings.provider, model }];
+  const chain = settings.modelChain ?? [{ provider: settings.provider, model }];
   return {
     Whisper: whisper,
-    "LLM model sırası": chain.map((c) => `${c.provider} · ${c.model || "?"}`).join(" → "),
+    "LLM model sırası": chain.map((c) => `${c.provider} · ${c.model || "?"}`).join(" → ") || "boş",
     "Şablon seçimi": templateChoice,
     "Şablon sayısı": String(settings.prompt.templates.length),
     "Parça sayısı": String(parts.length),
