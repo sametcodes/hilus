@@ -28,8 +28,8 @@ pub async fn complete(settings: &Settings, prompt: &str) -> Result<Completion, S
         .build()
         .map_err(|e| e.to_string())?;
     let mut failures = Vec::new();
-    for choice in settings.chain() {
-        match complete_one(&client, settings, &choice, prompt).await {
+    for (i, choice) in settings.chain().into_iter().enumerate() {
+        match complete_one(&client, &choice, prompt).await {
             Ok(text) => {
                 return Ok(Completion {
                     text,
@@ -38,7 +38,7 @@ pub async fn complete(settings: &Settings, prompt: &str) -> Result<Completion, S
                     failures,
                 })
             }
-            Err(e) => failures.push(format!("{}: {e}", choice_label(&choice))),
+            Err(e) => failures.push(format!("{}. {}: {e}", i + 1, choice_label(&choice))),
         }
     }
     Err(match failures.as_slice() {
@@ -58,25 +58,13 @@ fn choice_label(choice: &ModelChoice) -> String {
 
 async fn complete_one(
     client: &reqwest::Client,
-    settings: &Settings,
     choice: &ModelChoice,
     prompt: &str,
 ) -> Result<String, String> {
     match choice.provider.as_str() {
-        "gemini" => {
-            openai_compatible(client, GEMINI_BASE_URL, &settings.gemini_key, &choice.model, prompt).await
-        }
-        "openai" => {
-            openai_compatible(
-                client,
-                &settings.openai_base_url,
-                &settings.openai_key,
-                &choice.model,
-                prompt,
-            )
-            .await
-        }
-        _ => anthropic(client, &settings.anthropic_key, &choice.model, prompt).await,
+        "gemini" => openai_compatible(client, GEMINI_BASE_URL, &choice.api_key, &choice.model, prompt).await,
+        "openai" => openai_compatible(client, &choice.base_url, &choice.api_key, &choice.model, prompt).await,
+        _ => anthropic(client, &choice.api_key, &choice.model, prompt).await,
     }
 }
 
@@ -282,11 +270,14 @@ mod tests {
 
     fn settings_with(chain: &[(&str, &str)], openai_base_url: String) -> Settings {
         Settings {
-            openai_base_url,
-            openai_key: "test".into(),
             model_chain: chain
                 .iter()
-                .map(|(p, m)| ModelChoice { provider: p.to_string(), model: m.to_string() })
+                .map(|(p, m)| ModelChoice {
+                    provider: p.to_string(),
+                    model: m.to_string(),
+                    api_key: if *p == "openai" { "test".into() } else { String::new() },
+                    base_url: openai_base_url.clone(),
+                })
                 .collect(),
             ..Settings::default()
         }
@@ -301,7 +292,7 @@ mod tests {
         assert_eq!(result.text, "RAPOR");
         assert_eq!(result.model, "yedek-model");
         assert_eq!(result.failures.len(), 1);
-        assert!(result.failures[0].starts_with("Gemini · gemini-2.5-flash:"));
+        assert!(result.failures[0].starts_with("1. Gemini · gemini-2.5-flash:"));
     }
 
     #[test]
@@ -309,7 +300,7 @@ mod tests {
         let base = fake_server("429 Too Many Requests", r#"{"error":{"message":"quota"}}"#);
         let settings = settings_with(&[("openai", "a"), ("gemini", "b")], base);
         let err = tauri::async_runtime::block_on(complete(&settings, "x")).unwrap_err();
-        assert!(err.contains("OpenAI-uyumlu · a: 429"), "{err}");
-        assert!(err.contains("Gemini · b:"), "{err}");
+        assert!(err.contains("1. OpenAI-uyumlu · a: 429"), "{err}");
+        assert!(err.contains("2. Gemini · b:"), "{err}");
     }
 }

@@ -27,10 +27,13 @@ export interface PromptConfig {
 
 export type Provider = "anthropic" | "gemini" | "openai";
 
-/** Rapor için denenecek bir model; anahtarı sağlayıcının kendi alanından gelir. */
+/** Rapor için denenecek bir model ve kendi anahtarı (aynı sağlayıcıdan farklı anahtarlı satırlar olabilir). */
 export interface ModelChoice {
   provider: Provider;
   model: string;
+  apiKey: string;
+  /** Yalnızca OpenAI-uyumlu için. */
+  baseUrl: string;
 }
 
 /** İşle'nin sonucu: metin, onu yazan model ve önceki modellerin hataları. */

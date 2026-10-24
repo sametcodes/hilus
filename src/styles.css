@@ -1000,7 +1000,7 @@ textarea.preview {
 
 .chain-item {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 6px;
   padding: 4px 6px;
   border-radius: 7px;
@@ -1023,6 +1023,26 @@ textarea.preview {
 
 .chain-item.dragging .grip {
   cursor: grabbing;
+}
+
+.chain-item > .grip,
+.chain-item > .tpl-no,
+.chain-item > .icon-btn {
+  align-self: flex-start;
+  margin-top: 7px;
+}
+
+.chain-fields {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.chain-line {
+  display: flex;
+  gap: 6px;
 }
 
 .chain-provider {

@@ -52,9 +52,13 @@ interface ModelList {
 
 /** Sağlayıcı+anahtar başına çekilmiş model listeleri (yalnızca bellekte). */
 const modelLists = new Map<string, ModelList>();
-const keyTimers = new Map<Provider, number>();
+interface ModelSlot {
+  choice: ModelChoice;
+  slot: HTMLElement;
+  status: HTMLElement;
+}
 /** Bu çizimdeki model alanları; model listesi gelince yalnızca bunlar yenilenir. */
-let modelSlots: { choice: ModelChoice; slot: HTMLElement }[] = [];
+let modelSlots: ModelSlot[] = [];
 
 const WHISPER_TOKEN_LIMIT = 220;
 
@@ -70,7 +74,13 @@ export function settingsOpen(): boolean {
 
 export function openSettings(current: Settings, saved: (s: Settings) => void) {
   draft = structuredClone(current);
-  if (!draft.modelChain?.length) draft.modelChain = [{ provider: draft.provider, model: modelOf(draft, draft.provider) }];
+  if (!draft.modelChain?.length) draft.modelChain = [{ provider: draft.provider, model: modelOf(draft, draft.provider), apiKey: "", baseUrl: "" }];
+  // Anahtarı/adresi boş satırlar eski ortak alanlardan doldurulur (arka uç da aynısını yapar).
+  for (const c of draft.modelChain) {
+    if (!c.apiKey?.trim()) c.apiKey = keyOf(draft, c.provider);
+    if (c.provider === "openai" && !c.baseUrl?.trim()) c.baseUrl = draft.openaiBaseUrl;
+    c.baseUrl ??= "";
+  }
   onSaved = saved;
   selectedTemplate = 0;
   api
@@ -97,6 +107,8 @@ async function save() {
   if (first) {
     draft.provider = first.provider;
     setModelOf(draft, first.provider, first.model);
+    setKeyOf(draft, first.provider, first.apiKey);
+    if (first.provider === "openai") draft.openaiBaseUrl = first.baseUrl;
   }
   try {
     await api.saveSettings(draft);
@@ -205,30 +217,32 @@ function aiTab(s: Settings): Node[] {
     render();
   };
   const add = () => {
-    const unused = PROVIDERS.map((o) => o.value as Provider).find((p) => !chain.some((c) => c.provider === p)) ?? "anthropic";
-    chain.push({ provider: unused, model: FALLBACK_MODELS[unused][0]?.value ?? "" });
+    chain.push({ provider: "anthropic", model: FALLBACK_MODELS.anthropic[0].value, apiKey: "", baseUrl: "" });
     render();
   };
   const items = h("div", { class: "chain-items" }, ...chain.map((c, i) => chainRow(s, c, i)));
   enableDragSort(items, ".chain-item", move, ".grip");
-  const used = PROVIDERS.map((o) => o.value as Provider).filter((p) => chain.some((c) => c.provider === p));
   const out: Node[] = [
     h("h3", {}, "Model sırası"),
-    h("p", { class: "hint" }, "“İşle” önce 1. modeli dener. Hata verirse (kota dolması, bağlantı, anahtar ya da sunucu hatası) sıradakine geçer. Sıralamak için ⠿ tutamacından sürükleyin."),
+    h("p", { class: "hint" }, "“İşle” önce 1. modeli dener. Hata verirse (kota dolması, bağlantı, anahtar ya da sunucu hatası) sıradakine geçer. Her satırın kendi anahtarı var; aynı modeli farklı anahtarlarla (ör. farklı harcama sınırlarıyla) birden fazla kez ekleyebilirsiniz. Sıralamak için ⠿ tutamacından sürükleyin."),
     items,
     h("div", {}, h("button", { class: "btn small", onclick: add }, "+ Model ekle")),
-    h("h3", {}, "API anahtarları"),
+    h("p", { class: "hint" }, "Anahtarlar bu bilgisayardaki ayar dosyasında düz metin olarak saklanır. Kayıt sırasında hiçbir LLM çağrısı yapılmaz; yalnızca “İşle” istek gönderir."),
   ];
-  for (const p of used) out.push(...keyFields(s, p));
-  out.push(h("p", { class: "hint" }, "Anahtarlar bu bilgisayardaki ayar dosyasında düz metin olarak saklanır. Kayıt sırasında hiçbir LLM çağrısı yapılmaz; yalnızca “İşle” istek gönderir."));
-  for (const entry of modelSlots) renderModelSlot(s, entry);
-  for (const p of used) if (keyOf(s, p).trim() && !modelLists.has(listKey(s, p))) void fetchModels(s, p);
+  for (const entry of modelSlots) renderModelSlot(entry);
+  for (const c of chain) if (c.apiKey.trim() && !modelLists.has(listKey(c))) void fetchModels(c);
   return out;
 }
 
 function chainRow(s: Settings, c: ModelChoice, i: number): HTMLElement {
   const slot = h("div", { class: "chain-model" });
-  modelSlots.push({ choice: c, slot });
+  const status = h("span", { class: "hint" });
+  modelSlots.push({ choice: c, slot, status });
+  let timer: number | undefined;
+  const onKeyChange = () => {
+    window.clearTimeout(timer);
+    timer = window.setTimeout(() => void fetchModels(c), 700);
+  };
   const provider = customSelect({
     options: PROVIDERS,
     value: c.provider,
@@ -236,9 +250,34 @@ function chainRow(s: Settings, c: ModelChoice, i: number): HTMLElement {
     onChange: (v) => {
       c.provider = v as Provider;
       c.model = FALLBACK_MODELS[c.provider][0]?.value ?? "";
+      // Aynı sağlayıcının başka satırında anahtar varsa onu öner.
+      c.apiKey = s.modelChain.find((o) => o !== c && o.provider === c.provider)?.apiKey ?? "";
+      if (c.provider === "openai" && !c.baseUrl) c.baseUrl = s.openaiBaseUrl;
       render();
     },
   });
+  const key = textInput(
+    c.apiKey,
+    (v) => {
+      c.apiKey = v;
+      onKeyChange();
+    },
+    { type: "password", placeholder: `${PROVIDER_NAMES[c.provider]} API anahtarı${c.provider === "anthropic" ? " (sk-ant-…)" : ""}` },
+  );
+  const lines: Node[] = [h("div", { class: "chain-line" }, provider, slot)];
+  if (c.provider === "openai") {
+    const base = textInput(
+      c.baseUrl,
+      (v) => {
+        c.baseUrl = v;
+        onKeyChange();
+      },
+      { placeholder: "https://…/v1" },
+    );
+    base.title = "…/v1 biçiminde; istekler {adres}/chat/completions ve {adres}/models'e gider.";
+    lines.push(base);
+  }
+  lines.push(key);
   const remove = h("button", { class: "icon-btn danger", title: "Sıradan çıkar", disabled: s.modelChain.length === 1 }, "✕");
   remove.addEventListener("click", () => {
     s.modelChain.splice(s.modelChain.indexOf(c), 1);
@@ -249,47 +288,14 @@ function chainRow(s: Settings, c: ModelChoice, i: number): HTMLElement {
     { class: "chain-item" },
     h("span", { class: "grip", title: "Sıralamak için sürükleyin", "aria-hidden": "true" }, "⠿"),
     h("span", { class: "tpl-no" }, String(i + 1)),
-    provider,
-    slot,
+    h(
+      "div",
+      { class: "chain-fields" },
+      ...lines,
+      status,
+    ),
     remove,
   );
-}
-
-function keyFields(s: Settings, p: Provider): Node[] {
-  const onKeyChange = () => {
-    window.clearTimeout(keyTimers.get(p));
-    keyTimers.set(p, window.setTimeout(() => void fetchModels(s, p), 700));
-  };
-  const out: Node[] = [];
-  if (p === "openai") {
-    out.push(
-      field(
-        "OpenAI-uyumlu temel adres",
-        textInput(s.openaiBaseUrl, (v) => {
-          s.openaiBaseUrl = v;
-          onKeyChange();
-        }),
-        "…/v1 biçiminde; istekler {adres}/chat/completions ve {adres}/models'e gider.",
-      ),
-    );
-  }
-  out.push(
-    field(
-      `${PROVIDER_NAMES[p]} API anahtarı`,
-      textInput(
-        keyOf(s, p),
-        (v) => {
-          setKeyOf(s, p, v);
-          onKeyChange();
-        },
-        { type: "password", placeholder: p === "anthropic" ? "sk-ant-…" : "" },
-      ),
-    ),
-  );
-  const status = h("span", { "data-model-status": p });
-  updateStatus(s, p, status);
-  out.push(status);
-  return out;
 }
 
 function keyOf(s: Settings, p: Provider): string {
@@ -312,47 +318,32 @@ function setModelOf(s: Settings, p: Provider, v: string) {
   else s.anthropicModel = v;
 }
 
-function listKey(s: Settings, p: Provider): string {
-  const base = p === "openai" ? s.openaiBaseUrl.trim() : "";
-  return `${p}|${base}|${keyOf(s, p).trim()}`;
+function listKey(c: ModelChoice): string {
+  const base = c.provider === "openai" ? c.baseUrl.trim() : "";
+  return `${c.provider}|${base}|${c.apiKey.trim()}`;
 }
 
-async function fetchModels(s: Settings, p: Provider) {
-  const key = listKey(s, p);
-  if (!keyOf(s, p).trim()) return refreshSlots(s, p);
+async function fetchModels(c: ModelChoice) {
+  const key = listKey(c);
+  if (!c.apiKey.trim()) return refreshSlots(key);
   modelLists.set(key, { status: "loading", models: [] });
-  refreshSlots(s, p);
+  refreshSlots(key);
   try {
-    const models = await api.listModels(p, keyOf(s, p), s.openaiBaseUrl);
+    const models = await api.listModels(c.provider, c.apiKey, c.baseUrl);
     modelLists.set(key, { status: "ok", models });
   } catch (err) {
     modelLists.set(key, { status: "error", models: [], error: errorText(err) });
   }
-  // Bu arada anahtar değiştiyse eski sonucu gösterme.
-  if (draft === s && listKey(s, p) === key) refreshSlots(s, p);
+  refreshSlots(key);
 }
 
-function refreshSlots(s: Settings, p: Provider) {
-  for (const entry of modelSlots) if (entry.choice.provider === p && entry.slot.isConnected) renderModelSlot(s, entry);
-  const status = document.querySelector<HTMLElement>(`[data-model-status="${p}"]`);
-  if (status) updateStatus(s, p, status);
+/** Aynı sağlayıcı+anahtarı kullanan satırların model alanlarını yeniler. */
+function refreshSlots(key: string) {
+  for (const entry of modelSlots) if (listKey(entry.choice) === key && entry.slot.isConnected) renderModelSlot(entry);
 }
 
-function updateStatus(s: Settings, p: Provider, el: HTMLElement) {
-  el.textContent = modelListStatus(s, p);
-  el.className = modelLists.get(listKey(s, p))?.status === "error" ? "hint warn" : "hint";
-}
-
-function modelListStatus(s: Settings, p: Provider): string {
-  const list = modelLists.get(listKey(s, p));
-  if (!keyOf(s, p).trim()) return "Anahtarı girince sağlayıcının modelleri listelenir.";
-  if (!list || list.status === "loading") return "Modeller alınıyor…";
-  if (list.status === "error") return `Model listesi alınamadı: ${list.error} — model adını elle yazabilirsiniz.`;
-  return `${list.models.length} model listelendi. Listede yoksa adı elle yazabilirsiniz.`;
-}
-
-function renderModelSlot(s: Settings, { choice, slot }: { choice: ModelChoice; slot: HTMLElement }) {
-  const list = modelLists.get(listKey(s, choice.provider));
+function renderModelSlot({ choice, slot, status }: ModelSlot) {
+  const list = modelLists.get(listKey(choice));
   const fetched = list?.status === "ok" && list.models.length > 0;
   const options: SelectOption[] = fetched
     ? list.models.map((m) => ({ value: m.id, label: m.label, hint: m.label !== m.id ? m.id : undefined }))
@@ -367,6 +358,11 @@ function renderModelSlot(s: Settings, { choice, slot }: { choice: ModelChoice; s
       emptyText: "Eşleşen model yok — yazdığınız ad kullanılır.",
     }),
   );
+  // Yalnızca sorun olduğunda satırın altında yazı göster.
+  const error = list?.status === "error" ? `Model listesi alınamadı: ${list.error} — model adını elle yazabilirsiniz.` : "";
+  status.textContent = error;
+  status.className = error ? "hint warn" : "hint";
+  status.hidden = !error;
 }
 
 function templatesTab(p: PromptConfig): Node[] {

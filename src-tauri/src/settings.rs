@@ -47,13 +47,18 @@ impl Default for PromptConfig {
     }
 }
 
-/// Rapor için denenecek bir model. Anahtar ve adres sağlayıcının kendi alanlarından gelir.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+/// Rapor için denenecek bir model ve kendi anahtarı. Aynı sağlayıcıdan farklı
+/// anahtarlarla (ör. farklı harcama sınırlarıyla) birden fazla satır olabilir.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
 pub struct ModelChoice {
     /// "anthropic" | "gemini" | "openai"
     pub provider: String,
     pub model: String,
+    /// Boşsa sağlayıcının eski ortak anahtar alanı kullanılır.
+    pub api_key: String,
+    /// Yalnızca OpenAI-uyumlu için; boşsa ortak adres alanı kullanılır.
+    pub base_url: String,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -117,7 +122,7 @@ impl Settings {
             .model_chain
             .iter()
             .filter(|c| !c.model.trim().is_empty())
-            .cloned()
+            .map(|c| self.with_shared_credentials(c.clone()))
             .collect();
         if !chain.is_empty() {
             return chain;
@@ -127,10 +132,27 @@ impl Settings {
             "openai" => &self.openai_model,
             _ => &self.anthropic_model,
         };
-        vec![ModelChoice {
+        vec![self.with_shared_credentials(ModelChoice {
             provider: self.provider.clone(),
             model: model.clone(),
-        }]
+            ..Default::default()
+        })]
+    }
+
+    /// Satırın boş anahtar/adres alanlarını sağlayıcının ortak alanlarıyla doldurur.
+    fn with_shared_credentials(&self, mut c: ModelChoice) -> ModelChoice {
+        if c.api_key.trim().is_empty() {
+            c.api_key = match c.provider.as_str() {
+                "gemini" => &self.gemini_key,
+                "openai" => &self.openai_key,
+                _ => &self.anthropic_key,
+            }
+            .clone();
+        }
+        if c.provider == "openai" && c.base_url.trim().is_empty() {
+            c.base_url = self.openai_base_url.clone();
+        }
+        c
     }
 }
 
@@ -198,10 +220,19 @@ mod tests {
     #[test]
     fn zincir_yoksa_eski_saglayici() {
         let s: Settings = serde_json::from_str(r#"{"provider":"gemini","geminiModel":"gemini-2.5-flash"}"#).unwrap();
-        assert_eq!(
-            s.chain(),
-            vec![ModelChoice { provider: "gemini".into(), model: "gemini-2.5-flash".into() }]
-        );
+        let chain = s.chain();
+        assert_eq!(chain.len(), 1);
+        assert_eq!((chain[0].provider.as_str(), chain[0].model.as_str()), ("gemini", "gemini-2.5-flash"));
+    }
+
+    #[test]
+    fn satir_anahtari_yoksa_ortak_anahtar() {
+        let s: Settings = serde_json::from_str(
+            r#"{"anthropicKey":"ortak","modelChain":[{"provider":"anthropic","model":"a"},{"provider":"anthropic","model":"a","apiKey":"ikinci"}]}"#,
+        )
+        .unwrap();
+        let keys: Vec<_> = s.chain().into_iter().map(|c| c.api_key).collect();
+        assert_eq!(keys, ["ortak", "ikinci"]);
     }
 
     #[test]
