@@ -994,33 +994,58 @@ textarea.preview {
 .chain-items {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  margin-bottom: 8px;
+  gap: 8px;
+  margin-bottom: 10px;
 }
 
 .chain-empty {
   padding: 14px;
-  margin: 0 0 8px;
+  margin: 0 0 10px;
   border: 1px dashed var(--border);
-  border-radius: 7px;
+  border-radius: 9px;
   color: var(--muted);
   text-align: center;
 }
 
+/* Kart: [tutamaç + sıra] [alanlar] [sil]. Yan öğeler ilk satırın ortasına hizalı. */
 .chain-item {
-  display: flex;
-  align-items: flex-start;
-  gap: 6px;
-  padding: 4px 6px;
-  border-radius: 7px;
+  --row: 35px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 10px;
+  padding: 10px 10px 10px 8px;
+  border-radius: 9px;
   border: 1px solid var(--border);
   background: var(--surface);
 }
 
-.chain-item .grip {
+.chain-side {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: var(--row);
+}
+
+.chain-side .grip {
   cursor: grab;
   touch-action: none;
-  padding: 4px 2px;
+  padding: 6px 2px;
+}
+
+.chain-no {
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font: 600 11px var(--mono);
+}
+
+.chain-item > .icon-btn {
+  margin-top: calc((var(--row) - 26px) / 2);
 }
 
 .chain-item.dragging {
@@ -1034,34 +1059,58 @@ textarea.preview {
   cursor: grabbing;
 }
 
-.chain-item > .grip,
-.chain-item > .tpl-no,
-.chain-item > .icon-btn {
-  align-self: flex-start;
-  margin-top: 7px;
-}
-
+/* Alanlar: üstte sağlayıcı | model, altta tam genişlikte adres ve anahtar. */
 .chain-fields {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.chain-line {
-  display: flex;
+  display: grid;
+  grid-template-columns: 170px minmax(0, 1fr);
   gap: 6px;
 }
 
-.chain-provider {
-  width: 170px;
-  flex: none;
+.chain-wide {
+  grid-column: 1 / -1;
 }
 
-.chain-model {
-  flex: 1;
-  min-width: 0;
+.chain-fields .hint:empty,
+.chain-fields .hint[hidden] {
+  display: none;
+}
+
+.chain-fields input[type="text"],
+.chain-fields input[type="password"] {
+  padding: 7px 10px;
+  height: var(--row);
+}
+
+.chain-fields .cs-trigger,
+.chain-fields .cs-input {
+  height: var(--row);
+}
+
+.secret {
+  position: relative;
+}
+
+.secret input {
+  padding-right: 36px !important;
+}
+
+.secret-toggle {
+  position: absolute;
+  right: 1px;
+  top: 1px;
+  bottom: 1px;
+  width: 34px;
+  display: grid;
+  place-items: center;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  border-radius: 0 7px 7px 0;
+}
+
+.secret-toggle:hover {
+  color: var(--text);
 }
 
 .model-slot .field {

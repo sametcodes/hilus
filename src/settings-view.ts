@@ -200,6 +200,28 @@ function textInput(value: string, set: (v: string) => void, attrs: Record<string
   return el;
 }
 
+const EYE = `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>`;
+const EYE_OFF = `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3l18 18"/><path d="M10.6 5.1A10.5 10.5 0 0 1 12 5c6.4 0 10 7 10 7a17 17 0 0 1-3.2 4.1M6.6 6.6C3.9 8.3 2 12 2 12s3.6 7 10 7a9.9 9.9 0 0 0 5.4-1.6"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>`;
+
+/** Gizli başlayan, göz düğmesiyle gösterilebilen anahtar alanı. */
+function secretInput(value: string, set: (v: string) => void, placeholder: string): HTMLElement {
+  const input = textInput(value, set, { type: "password", placeholder, autocomplete: "off" });
+  const toggle = h("button", { type: "button", class: "secret-toggle" });
+  const sync = () => {
+    const hidden = input.type === "password";
+    toggle.innerHTML = hidden ? EYE : EYE_OFF;
+    toggle.title = hidden ? "Anahtarı göster" : "Anahtarı gizle";
+    toggle.setAttribute("aria-label", toggle.title);
+  };
+  toggle.addEventListener("click", () => {
+    input.type = input.type === "password" ? "text" : "password";
+    sync();
+    input.focus();
+  });
+  sync();
+  return h("div", { class: "secret" }, input, toggle);
+}
+
 function textArea(value: string, set: (v: string) => void, rows: number, mono = false): HTMLTextAreaElement {
   const el = h("textarea", { rows, value, spellcheck: false, class: mono ? "mono" : "" });
   el.addEventListener("input", () => set(el.value));
@@ -240,7 +262,7 @@ function aiTab(s: Settings): Node[] {
 
 function chainRow(s: Settings, c: ModelChoice, i: number): HTMLElement {
   const slot = h("div", { class: "chain-model" });
-  const status = h("span", { class: "hint" });
+  const status = h("span", { class: "hint chain-wide" });
   modelSlots.push({ choice: c, slot, status });
   let timer: number | undefined;
   const onKeyChange = () => {
@@ -260,15 +282,16 @@ function chainRow(s: Settings, c: ModelChoice, i: number): HTMLElement {
       render();
     },
   });
-  const key = textInput(
+  const key = secretInput(
     c.apiKey,
     (v) => {
       c.apiKey = v;
       onKeyChange();
     },
-    { type: "password", placeholder: `${PROVIDER_NAMES[c.provider]} API anahtarı${c.provider === "anthropic" ? " (sk-ant-…)" : ""}` },
+    `${PROVIDER_NAMES[c.provider]} API anahtarı${c.provider === "anthropic" ? " (sk-ant-…)" : ""}`,
   );
-  const lines: Node[] = [h("div", { class: "chain-line" }, provider, slot)];
+  key.classList.add("chain-wide");
+  const lines: Node[] = [provider, slot];
   if (c.provider === "openai") {
     const base = textInput(
       c.baseUrl,
@@ -279,6 +302,7 @@ function chainRow(s: Settings, c: ModelChoice, i: number): HTMLElement {
       { placeholder: "https://…/v1" },
     );
     base.title = "…/v1 biçiminde; istekler {adres}/chat/completions ve {adres}/models'e gider.";
+    base.classList.add("chain-wide");
     lines.push(base);
   }
   lines.push(key);
@@ -290,14 +314,13 @@ function chainRow(s: Settings, c: ModelChoice, i: number): HTMLElement {
   return h(
     "div",
     { class: "chain-item" },
-    h("span", { class: "grip", title: "Sıralamak için sürükleyin", "aria-hidden": "true" }, "⠿"),
-    h("span", { class: "tpl-no" }, String(i + 1)),
     h(
       "div",
-      { class: "chain-fields" },
-      ...lines,
-      status,
+      { class: "chain-side" },
+      h("span", { class: "grip", title: "Sıralamak için sürükleyin", "aria-hidden": "true" }, "⠿"),
+      h("span", { class: "chain-no", title: `${i + 1}. sırada denenir` }, String(i + 1)),
     ),
+    h("div", { class: "chain-fields" }, ...lines, status),
     remove,
   );
 }
@@ -365,7 +388,7 @@ function renderModelSlot({ choice, slot, status }: ModelSlot) {
   // Yalnızca sorun olduğunda satırın altında yazı göster.
   const error = list?.status === "error" ? `Model listesi alınamadı: ${list.error} — model adını elle yazabilirsiniz.` : "";
   status.textContent = error;
-  status.className = error ? "hint warn" : "hint";
+  status.classList.toggle("warn", Boolean(error));
   status.hidden = !error;
 }
 
